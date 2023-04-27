@@ -712,10 +712,10 @@ static void ShowLogWindow(bool *p_open)
                     switch (channel.data_type)
                     {
                     case DataType::DataType_uint8_t:
-                        string_buf_idx += sprintf(string_buf + string_buf_idx, "%s: %d ", channel.name, *((uint8_t *)(data_buf_offset + channel.byte_offset)));
+                        string_buf_idx += snprintf(string_buf + string_buf_idx, sizeof(string_buf),"%s: %d ", channel.name, *((uint8_t *)(data_buf_offset + channel.byte_offset)));
                         break;
                     case DataType::DataType_float:
-                        string_buf_idx += sprintf(string_buf + string_buf_idx, "%s: %f ", channel.name, *((float *)(data_buf_offset + channel.byte_offset)));
+                        string_buf_idx += snprintf(string_buf + string_buf_idx, sizeof(string_buf), "%s: %f ", channel.name, *((float *)(data_buf_offset + channel.byte_offset)));
                         break;
                     default:
                         break;
@@ -774,7 +774,7 @@ ImPlotPoint DataWave(int idx, void *data)
 void Demo_TimeScale()
 {
 
-    if (ImPlot::BeginPlot("##Time", ImVec2(-1, 0)))
+    if (ImPlot::BeginPlot("Singnal Plot", ImVec2(-1, 0)))
     {
         ImPlot::SetupAxesLimits(0, 1, 0, 1);
         ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"s");
@@ -782,8 +782,8 @@ void Demo_TimeScale()
         int64_t plot_t_min = (size_t)(ImPlot::GetPlotLimits().X.Min * data_freq);
         int64_t plot_t_max = (size_t)(ImPlot::GetPlotLimits().X.Max * data_freq) + 3;
 
-        int32_t t_min = data_idx_min();
-        int32_t t_max = data_idx_max();
+        int64_t t_min = data_idx_min();
+        int64_t t_max = data_idx_max();
 
         if (plot_t_max < t_min)
         {
@@ -830,12 +830,74 @@ void Demo_TimeScale()
         }
 
         size_t count = size / stride;
+
+        static bool one_time_run = true;
+        static size_t channel_num = channels.size();
+        static std::vector<int8_t> channel_enable_colors;
+        static std::vector<ImVec4> channel_colors;
+        static std::vector<float> channel_alphas;
+        static std::vector<float> channel_thickness;
+        static std::vector<int8_t> channel_markers;
+        static std::vector<int8_t> channel_shaded;
+
+        if (one_time_run)
+        {
+            one_time_run = false;
+            for (int i = 0; i < channel_num; i++)
+            {
+                channel_enable_colors.push_back(0);
+                channel_colors.push_back(ImVec4(1, 1, 0, 1));
+                channel_alphas.push_back(1.0f);
+                channel_thickness.push_back(1.0f);
+                channel_markers.push_back(false);
+                channel_shaded.push_back(false);
+            }
+        }
+
         for (const auto &channel : channels)
         {
             WaveData data5(base, channel.id, stride, plot_t_min);
-            ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
-            ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, 0.25f);
+            if (channel_markers[channel.id])
+            {
+                ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, channel_alphas[channel.id]);
+                ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
+            }
+
+            if (channel_enable_colors[channel.id])
+            {
+                ImPlot::SetNextLineStyle(channel_colors[channel.id], channel_thickness[channel.id]);
+            }
+            else
+            {
+                ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, channel_thickness[channel.id]);
+            }
             ImPlot::PlotLineG(channel.name, DataWave, &data5, count);
+            auto lamda = [](int idx, void *data)
+            {
+                WaveData *wd = (WaveData *)data;
+                return ImPlotPoint((wd->plot_min + idx * wd->stride) / data_freq, 0);
+            };
+            if (channel_shaded[channel.id])
+                ImPlot::PlotShadedG(channel.name, DataWave, &data5, lamda, &data5, count);
+            // custom legend context menu
+            if (ImPlot::BeginLegendPopup(channel.name))
+            {
+                ImGui::Checkbox("Color", (bool *)(&(channel_enable_colors[channel.id])));
+                if (channel_enable_colors[channel.id])
+                {
+                    ImGui::SameLine();
+                    ImGui::ColorEdit3("Color", &channel_colors[channel.id].x);
+                }
+                ImGui::SliderFloat("Thickness", &(channel_thickness[channel.id]), 0, 5);
+                ImGui::Checkbox("Markers", (bool *)&(channel_markers[channel.id]));
+                if (channel_markers[channel.id])
+                {
+                    ImGui::SameLine();
+                    ImGui::SliderFloat("Transparency", &(channel_alphas[channel.id]), 0, 1, "%.2f");
+                }
+                ImGui::Checkbox("Shaded", (bool *)&(channel_shaded[channel.id]));
+                ImPlot::EndLegendPopup();
+            }
         }
         ImPlot::EndPlot();
     }
