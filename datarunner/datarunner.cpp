@@ -266,7 +266,7 @@ std::vector<data_channel> create_data_channel_array(const std::string &code_str,
 #include "asio.hpp"
 using asio::ip::tcp;
 
-bool stop_transfer = false;
+bool stop_transfer = true;
 #define DATA_BUF_SIZE (1024 * 1024 * 1024)
 #define PAKCET_BUF_DIVSION (100) // 100 for 1%, 10 for 10%
 #define RECV_BUF_SIZE (10 * 1024)
@@ -337,6 +337,7 @@ void dataquery()
     receive_buffer.fill(0);
     size_t read_len = 0;
     size_t total = 0;
+    static bool one_more_time = false;
     //
     while ((read_len = data_socket.read_some(asio::buffer(receive_buffer), error)) >= 0)
     {
@@ -349,11 +350,17 @@ void dataquery()
             char *data = receive_buffer.data();
             extractData(data, read_len);
         }
-        if (stop_transfer)
+        if (one_more_time)
         {
+            one_more_time = false;
+            data_socket.close();
             printf("stop.\n");
             std::cout << std::endl;
             return;
+        }
+        if (stop_transfer)
+        {
+            one_more_time = true;
         }
     }
 }
@@ -471,11 +478,6 @@ int main()
                   << ", Byte Offset: " << channel.byte_offset << ", Data type: " << DataTypeStringDict[channel.data_type] << std::endl;
     }
 
-    // connection
-    data_socket.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string("192.168.1.2"), 5000));
-    // data_socket.set_option(asio::detail::socket_option::integer<SOL_SOCKET, SO_RCVTIMEO>{200});
-    std::thread t1(dataquery);
-
     // init glfw context, load openGL 3.3 with core profile setting
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -561,7 +563,7 @@ int main()
             }
             ImGui::EndMenuBar();
         }
-        ImGui::Text("Hello, world %d", 123);
+
         static float progress = 0.0f;
         progress = (float)data_buf_idx / DATA_BUF_SIZE;
         ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
@@ -570,28 +572,54 @@ int main()
 
         ImGui::Text("packet num: %lld, bytes: %lld", packet_idx, data_buf_idx);
 
-        static char frequency_string[1000];
-        MetricFormatter(data_freq, frequency_string, 1000, (void *)"Hz");
-        ImGui::SliderFloat("data frequency", &data_freq, 1000.0f, 100000.0f, frequency_string);
+        ImGui::PushItemWidth(160);
+        static char ip_addr[128] = "192.168.1.2";
+        ImGui::InputTextWithHint("IP", "192.168.1.2", ip_addr, IM_ARRAYSIZE(ip_addr));
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+        ImGui::PushItemWidth(80);
+        static int port = 5000;
+        ImGui::InputInt("Port", &port);
+        ImGui::PopItemWidth();
 
-        if (ImGui::Button("Stop"))
+        ImGui::SameLine();
+        static std::thread t1;
+        static std::string start_button_string = "Start";
+        if (ImGui::Button(start_button_string.data()))
         {
-            asio::error_code error;
-            const std::string end_msg = "end!!";
-            asio::write(data_socket, asio::buffer(end_msg), error);
-            if (!error)
+            if (stop_transfer)
             {
-                std::cout << "\nClient sent end message!" << std::endl;
+                // connection
+                data_socket.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(ip_addr), port));
+                // data_socket.set_option(asio::detail::socket_option::integer<SOL_SOCKET, SO_RCVTIMEO>{200});
+                t1 = std::thread(dataquery);
+                stop_transfer = false;
+                start_button_string = "Stop";
             }
             else
             {
-                std::cout << "send failed: " << error.message() << std::endl;
-            }
-            stop_transfer = true;
-            t1.join();
+                asio::error_code error;
+                const std::string end_msg = "end!!";
+                asio::write(data_socket, asio::buffer(end_msg), error);
+                if (!error)
+                {
+                    std::cout << "\nClient sent end message!" << std::endl;
+                }
+                else
+                {
+                    std::cout << "send failed: " << error.message() << std::endl;
+                }
+                stop_transfer = true;
+                start_button_string = "Start";
+                t1.join();
 
-            printf("\njoin\n");
+                printf("\njoin\n");
+            }
         }
+
+        static char frequency_string[1000];
+        MetricFormatter(data_freq, frequency_string, 1000, (void *)"Hz");
+        ImGui::SliderFloat("data frequency", &data_freq, 1000.0f, 100000.0f, frequency_string);
 
         ImGui::InputText("string", buf, IM_ARRAYSIZE(buf));
         ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
@@ -722,7 +750,9 @@ ImPlotPoint DataWave(int idx, void *data)
     if (packet_round > 0)
     {
         packet_pos = data_buf + (((wd->base + idx * wd->stride) % packet_max) * packet_size);
-    } else {
+    }
+    else
+    {
         packet_pos = data_buf + ((wd->base + idx * wd->stride) * packet_size);
     }
     char *data_pos = packet_pos + channels[wd->id].byte_offset;
@@ -800,7 +830,8 @@ void Demo_TimeScale()
         }
 
         size_t count = size / stride;
-        for (const auto& channel : channels) {
+        for (const auto &channel : channels)
+        {
             WaveData data5(base, channel.id, stride, plot_t_min);
             ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
             ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, 0.25f);
