@@ -268,10 +268,40 @@ using asio::ip::tcp;
 
 bool stop_transfer = false;
 #define DATA_BUF_SIZE (1024 * 1024 * 1024)
+#define PAKCET_BUF_DIVSION (100) // 100 for 1%, 10 for 10%
 #define RECV_BUF_SIZE (10 * 1024)
 char data_buf[DATA_BUF_SIZE];
 size_t packet_size = 0;
+size_t packet_max = 0;
+size_t packet_idx = 0;
+size_t packet_round = 0;
+size_t packet_buf_buf = 0; // buffer for when reading from plot not changed by socket
 size_t data_buf_idx = 0;
+float data_freq = 10000.0f;
+size_t data_idx_min()
+{
+    if (packet_round > 0)
+    {
+        return (packet_idx + packet_buf_buf + (packet_round - 1) * packet_max);
+    }
+    else
+    {
+        return (0);
+    }
+}
+
+size_t data_idx_max()
+{
+    if (packet_round > 0)
+    {
+        return (packet_idx + packet_round * packet_max);
+    }
+    else
+    {
+        return (packet_idx);
+    }
+}
+
 asio::io_service io_service;
 // socket creation
 asio::ip::tcp::socket data_socket(io_service);
@@ -321,7 +351,7 @@ void dataquery()
         }
         if (stop_transfer)
         {
-            printf("%lld\n", data_buf_idx);
+            printf("stop.\n");
             std::cout << std::endl;
             return;
         }
@@ -353,6 +383,13 @@ void extractData(char *data, size_t data_len)
             data_buf_idx += (receive_buffer_temp_len - 1);
             mem_cpy(data_buf + data_buf_idx, data, end_pos);
             data_buf_idx += end_pos;
+            packet_idx += 1;
+            if (packet_idx >= packet_max)
+            {
+                packet_idx = 0;
+                data_buf_idx = 0;
+                packet_round += 1;
+            }
             printf("good\n");
         }
         else
@@ -374,6 +411,13 @@ void extractData(char *data, size_t data_len)
                 {
                     mem_cpy(data_buf + data_buf_idx, cur_pos + 1, packet_size);
                     data_buf_idx += packet_size;
+                    packet_idx += 1;
+                    if (packet_idx >= packet_max)
+                    {
+                        packet_idx = 0;
+                        data_buf_idx = 0;
+                        packet_round += 1;
+                    }
                     idx = end_pos;
                 }
             }
@@ -389,6 +433,25 @@ void extractData(char *data, size_t data_len)
     }
 }
 
+int MetricFormatter(double value, char *buff, int size, void *data)
+{
+    const char *unit = (const char *)data;
+    static double v[] = {1000000000, 1000000, 1000, 1, 0.001, 0.000001, 0.000000001};
+    static const char *p[] = {"G", "M", "k", "", "m", "u", "n"};
+    if (value == 0)
+    {
+        return snprintf(buff, size, "0 %s", unit);
+    }
+    for (int i = 0; i < 7; ++i)
+    {
+        if (fabs(value) >= v[i])
+        {
+            return snprintf(buff, size, "%g %s%s", value / v[i], p[i], unit);
+        }
+    }
+    return snprintf(buff, size, "%g %s%s", value / v[6], p[6], unit);
+}
+
 static void ShowLogWindow(bool *p_open);
 void Demo_TimeScale();
 std::vector<data_channel> channels;
@@ -399,6 +462,8 @@ int main()
         "uint8_t send_buf[7]; \n";
 
     channels = create_data_channel_array(code_str, &packet_size);
+    packet_max = DATA_BUF_SIZE / packet_size;
+    packet_buf_buf = packet_max / PAKCET_BUF_DIVSION;
 
     for (const auto &channel : channels)
     {
@@ -503,6 +568,12 @@ int main()
         ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
         ImGui::Text("Progress Bar");
 
+        ImGui::Text("packet num: %lld, bytes: %lld", packet_idx, data_buf_idx);
+
+        static char frequency_string[1000];
+        MetricFormatter(data_freq, frequency_string, 1000, (void *)"Hz");
+        ImGui::SliderFloat("data frequency", &data_freq, 1000.0f, 100000.0f, frequency_string);
+
         if (ImGui::Button("Stop"))
         {
             asio::error_code error;
@@ -530,7 +601,16 @@ int main()
             printf("%f", f);
         }
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        Demo_TimeScale();
+
+        static int clicked = 0;
+        if (ImGui::Button("Plot"))
+            clicked++;
+        if (clicked & 1)
+        {
+            ImGui::SameLine();
+            ImGui::Text("Thanks for clicking me!");
+            Demo_TimeScale();
+        }
         ImGui::End();
 
         if (show_log_window)
@@ -584,7 +664,14 @@ static void ShowLogWindow(bool *p_open)
         // Multiple calls to Text(), manually coarsely clipped - demonstrate how to use the ImGuiListClipper helper.
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
         ImGuiListClipper clipper;
-        clipper.Begin(data_buf_idx / packet_size);
+        if (packet_round == 0)
+        {
+            clipper.Begin(packet_idx);
+        }
+        else
+        {
+            clipper.Begin(packet_max - packet_buf_buf);
+        }
         char string_buf[1000];
         int16_t string_buf_idx = 0;
         while (clipper.Step())
@@ -597,11 +684,10 @@ static void ShowLogWindow(bool *p_open)
                     switch (channel.data_type)
                     {
                     case DataType::DataType_uint8_t:
-                        string_buf_idx += sprintf(string_buf+string_buf_idx, "%s: %d ", channel.name, *((uint8_t *)(data_buf_offset + channel.byte_offset)));
+                        string_buf_idx += sprintf(string_buf + string_buf_idx, "%s: %d ", channel.name, *((uint8_t *)(data_buf_offset + channel.byte_offset)));
                         break;
                     case DataType::DataType_float:
-                        string_buf_idx += sprintf(string_buf+string_buf_idx, "%s: %f ", channel.name, *((float *)(data_buf_offset + channel.byte_offset)));
-                        // string_buf_idx += sprintf_s(string_buf + string_buf_idx, sizeof(string_buf), "%f ", *((float *)(data_buf_offset+channel.byte_offset)));
+                        string_buf_idx += sprintf(string_buf + string_buf_idx, "%s: %f ", channel.name, *((float *)(data_buf_offset + channel.byte_offset)));
                         break;
                     default:
                         break;
@@ -617,105 +703,109 @@ static void ShowLogWindow(bool *p_open)
     ImGui::End();
 }
 
-// Huge data used by Time Formatting example (~500 MB allocation!)
-struct HugeTimeData
+struct WaveData
 {
-    HugeTimeData(double min)
+    size_t base, id, stride, plot_min;
+    WaveData(size_t Base, size_t Id, size_t Stride, size_t Plot_min)
     {
-        Ts = new double[Size];
-        Ys = new double[Size];
-        for (int i = 0; i < Size; ++i)
-        {
-            Ts[i] = min + i;
-            Ys[i] = GetY(Ts[i]);
-        }
+        base = Base;
+        id = Id;
+        stride = Stride;
+        plot_min = Plot_min;
     }
-    ~HugeTimeData()
-    {
-        delete[] Ts;
-        delete[] Ys;
-    }
-    static double GetY(double t)
-    {
-        return 0.5 + 0.25 * sin(t / 86400 / 12) + 0.005 * sin(t / 3600);
-    }
-    double *Ts;
-    double *Ys;
-    static const int Size = 60 * 60 * 24 * 366;
 };
 
-int MetricFormatter(double value, char *buff, int size, void *data)
+ImPlotPoint DataWave(int idx, void *data)
 {
-    const char *unit = (const char *)data;
-    static double v[] = {1000000000, 1000000, 1000, 1, 0.001, 0.000001, 0.000000001};
-    static const char *p[] = {"G", "M", "k", "", "m", "u", "n"};
-    if (value == 0)
+    WaveData *wd = (WaveData *)data;
+    char *packet_pos;
+    if (packet_round > 0)
     {
-        return snprintf(buff, size, "0 %s", unit);
+        packet_pos = data_buf + (((wd->base + idx * wd->stride) % packet_max) * packet_size);
+    } else {
+        packet_pos = data_buf + ((wd->base + idx * wd->stride) * packet_size);
     }
-    for (int i = 0; i < 7; ++i)
+    char *data_pos = packet_pos + channels[wd->id].byte_offset;
+
+    double time = (wd->plot_min + idx * wd->stride) / data_freq;
+    switch (channels[wd->id].data_type)
     {
-        if (fabs(value) >= v[i])
-        {
-            return snprintf(buff, size, "%g %s%s", value / v[i], p[i], unit);
-        }
+    case DataType::DataType_uint8_t:
+        return ImPlotPoint(time, *((uint8_t *)data_pos));
+        break;
+    case DataType::DataType_float:
+        return ImPlotPoint(time, *((float *)data_pos));
+        break;
+    default:
+        break;
     }
-    return snprintf(buff, size, "%g %s%s", value / v[6], p[6], unit);
 }
 
 void Demo_TimeScale()
 {
 
-    static double t_min = 1609459200; // 01/01/2021 @ 12:00:00am (UTC)
-    static double t_max = 1640995200; // 01/01/2022 @ 12:00:00am (UTC)
-
-    ImGui::BulletText("When ImPlotAxisFlags_Time is enabled on the X-Axis, values are interpreted as\n"
-                      "UNIX timestamps in seconds and axis labels are formated as date/time.");
-    ImGui::BulletText("By default, labels are in UTC time but can be set to use local time instead.");
-
-    ImGui::Checkbox("Local Time", &ImPlot::GetStyle().UseLocalTime);
-    ImGui::SameLine();
-    ImGui::Checkbox("ISO 8601", &ImPlot::GetStyle().UseISO8601);
-    ImGui::SameLine();
-    ImGui::Checkbox("24 Hour Clock", &ImPlot::GetStyle().Use24HourClock);
-
-    static HugeTimeData *data = nullptr;
-    if (data == nullptr)
-    {
-        ImGui::SameLine();
-        if (ImGui::Button("Generate Huge Data (~500MB!)"))
-        {
-            static HugeTimeData sdata(t_min);
-            data = &sdata;
-        }
-    }
-
     if (ImPlot::BeginPlot("##Time", ImVec2(-1, 0)))
     {
-        // ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Time);
-        ImPlot::SetupAxesLimits(t_min, t_max, 0, 1);
+        ImPlot::SetupAxesLimits(0, 1, 0, 1);
         ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"s");
-        if (data != nullptr)
+
+        int64_t plot_t_min = (size_t)(ImPlot::GetPlotLimits().X.Min * data_freq);
+        int64_t plot_t_max = (size_t)(ImPlot::GetPlotLimits().X.Max * data_freq) + 3;
+
+        int32_t t_min = data_idx_min();
+        int32_t t_max = data_idx_max();
+
+        if (plot_t_max < t_min)
         {
-            // downsample our data
-            int downsample = (int)ImPlot::GetPlotLimits().X.Size() / 1000 + 1;
-            int start = (int)(ImPlot::GetPlotLimits().X.Min - t_min);
-            start = start < 0 ? 0 : start > HugeTimeData::Size - 1 ? HugeTimeData::Size - 1
-                                                                   : start;
-            int end = (int)(ImPlot::GetPlotLimits().X.Max - t_min) + 1000;
-            end = end < 0 ? 0 : end > HugeTimeData::Size - 1 ? HugeTimeData::Size - 1
-                                                             : end;
-            int size = (end - start) / downsample;
-            // plot it
+            printf("max %lld %lld\n", plot_t_max, t_min);
+            ImPlot::EndPlot();
+            return;
+        }
+
+        if (plot_t_min > t_max)
+        {
+            printf("min %lld %lld\n", plot_t_min, t_max);
+            ImPlot::EndPlot();
+            return;
+        }
+
+        if (plot_t_min < t_min)
+        {
+            plot_t_min = t_min;
+        }
+        if (plot_t_max > t_max)
+        {
+            plot_t_max = t_max;
+        }
+
+        size_t base = 0;
+        if (packet_round > 0)
+        {
+            base = plot_t_min - t_min + packet_idx + packet_buf_buf;
+        }
+        else
+        {
+            base = plot_t_min - t_min;
+        }
+
+        size_t size = plot_t_max - plot_t_min;
+        size_t stride = 0;
+        if (size < 1000)
+        {
+            stride = 1;
+        }
+        else
+        {
+            stride = size / 1000;
+        }
+
+        size_t count = size / stride;
+        for (const auto& channel : channels) {
+            WaveData data5(base, channel.id, stride, plot_t_min);
             ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
             ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, 0.25f);
-            ImPlot::PlotLine("Time Series", &data->Ts[start], &data->Ys[start], size, 0, 0, sizeof(double) * downsample);
+            ImPlot::PlotLineG(channel.name, DataWave, &data5, count);
         }
-        // plot time now
-        double t_now = (double)time(nullptr);
-        double y_now = HugeTimeData::GetY(t_now);
-        ImPlot::PlotScatter("Now", &t_now, &y_now, 1);
-        ImPlot::Annotation(t_now, y_now, ImPlot::GetLastItemColor(), ImVec2(10, 10), false, "Now");
         ImPlot::EndPlot();
     }
 }
