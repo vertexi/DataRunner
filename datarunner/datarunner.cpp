@@ -453,7 +453,14 @@ int MetricFormatter(double value, char *buff, int size, void *data)
     {
         if (fabs(value) >= v[i])
         {
-            return snprintf(buff, size, "%g %s%s", value / v[i], p[i], unit);
+            if (i > 3) {
+                return snprintf(buff, size, "%g %s%s", value / v[i], p[i], unit);
+            } else {
+                int temp = snprintf(buff, size, "%lld%s%s", (int64_t)value / (int64_t)v[i], p[i], unit);
+                return MetricFormatter((value - (int64_t)value), buff + temp, size - temp, data);
+                // snprintf(buff + temp, size - temp, "%g %s%s", (value - (int64_t)value) / v[i], p[i], unit);
+            }
+
         }
     }
     return snprintf(buff, size, "%g %s%s", value / v[6], p[6], unit);
@@ -534,10 +541,7 @@ int main()
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    char buf[200] = "hello";
-    float f = 0.0f;
-
-    static bool show_log_window = true;
+    static bool show_log_window = false;
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
@@ -617,28 +621,17 @@ int main()
             }
         }
 
-        static char frequency_string[1000];
-        MetricFormatter(data_freq, frequency_string, 1000, (void *)"Hz");
-        ImGui::SliderFloat("data frequency", &data_freq, 1000.0f, 100000.0f, frequency_string);
+        ImGui::SameLine();
+        static char frequency_string[100];
+        MetricFormatter(data_freq, frequency_string, 100, (void *)"Hz");
+        ImGui::PushItemWidth(120);
+        ImGui::DragFloat("data frequency", &data_freq, 1000.0f, 0.0f, 100000.0f, frequency_string);
+        ImGui::PopItemWidth();
 
-        ImGui::InputText("string", buf, IM_ARRAYSIZE(buf));
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-        if (ImGui::Button("print"))
-        {
-            printf("%s", buf);
-            printf("%f", f);
-        }
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
-        static int clicked = 0;
-        if (ImGui::Button("Plot"))
-            clicked++;
-        if (clicked & 1)
-        {
-            ImGui::SameLine();
-            ImGui::Text("Thanks for clicking me!");
-            Demo_TimeScale();
-        }
+        Demo_TimeScale();
+
         ImGui::End();
 
         if (show_log_window)
@@ -712,7 +705,7 @@ static void ShowLogWindow(bool *p_open)
                     switch (channel.data_type)
                     {
                     case DataType::DataType_uint8_t:
-                        string_buf_idx += snprintf(string_buf + string_buf_idx, sizeof(string_buf),"%s: %d ", channel.name, *((uint8_t *)(data_buf_offset + channel.byte_offset)));
+                        string_buf_idx += snprintf(string_buf + string_buf_idx, sizeof(string_buf), "%s: %d ", channel.name, *((uint8_t *)(data_buf_offset + channel.byte_offset)));
                         break;
                     case DataType::DataType_float:
                         string_buf_idx += snprintf(string_buf + string_buf_idx, sizeof(string_buf), "%s: %f ", channel.name, *((float *)(data_buf_offset + channel.byte_offset)));
@@ -771,13 +764,170 @@ ImPlotPoint DataWave(int idx, void *data)
     }
 }
 
+template <typename T>
+inline T RandomRange(T min, T max)
+{
+    T scale = rand() / (T)RAND_MAX;
+    return min + scale * (max - min);
+}
+
+ImVec4 RandomColor()
+{
+    ImVec4 col;
+    col.x = RandomRange(0.0f, 1.0f);
+    col.y = RandomRange(0.0f, 1.0f);
+    col.z = RandomRange(0.0f, 1.0f);
+    col.w = 1.0f;
+    return col;
+}
+
+static const ImU32 Dark_Data[9] = {
+    4280031972,
+    4290281015,
+    4283084621,
+    4288892568,
+    4278222847,
+    4281597951,
+    4280833702,
+    4290740727,
+    4288256409
+};
+
 void Demo_TimeScale()
 {
 
-    if (ImPlot::BeginPlot("Singnal Plot", ImVec2(-1, 0)))
+    static bool one_time_run = true;
+    static size_t channel_num = channels.size();
+
+    // convenience struct to manage DND items; do this however you like
+    struct MyDndItem
+    {
+        int Plt;
+        ImAxis Yax;
+        char Label[100];
+        bool color_enable;
+        ImVec4 Color;
+        float alpha;
+        float thickness;
+        bool markers;
+        bool shaded;
+
+        MyDndItem(char *name, ImVec4 color)
+        {
+            Plt = 0;
+            Yax = ImAxis_Y1;
+            Color = color;
+            alpha = 1.0f;
+            thickness = 1.0f;
+            markers = true;
+            shaded = false;
+            color_enable = true;
+            snprintf(Label, sizeof(Label), "%s", name);
+        }
+        void Reset()
+        {
+            Plt = 0;
+            Yax = ImAxis_Y1;
+        }
+    };
+
+    static std::vector<MyDndItem> dnd;
+
+    if (one_time_run)
+    {
+        one_time_run = false;
+        for (int i = 0; i < channel_num; i++)
+        {
+            if (i < 9) {
+                dnd.push_back(MyDndItem(channels[i].name, ImGui::ColorConvertU32ToFloat4(Dark_Data[i])));
+            } else
+            {
+                dnd.push_back(MyDndItem(channels[i].name, RandomColor()));
+            }
+        }
+    }
+
+    // child window to serve as initial source for our DND items
+    ImGui::BeginChild("DND_LEFT", ImVec2(100, 400));
+    if (ImGui::Button("Reset Data"))
+    {
+        for (int k = 0; k < channel_num; ++k)
+            dnd[k].Reset();
+    }
+
+    for (int k = 0; k < channel_num; ++k)
+    {
+        if (dnd[k].Plt > 0)
+            continue;
+        ImPlot::ItemIcon(dnd[k].Color);
+        ImGui::SameLine();
+        ImGui::Selectable(dnd[k].Label, false, 0, ImVec2(100, 0));
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+        {
+            ImGui::SetDragDropPayload("MY_DND", &k, sizeof(int));
+            ImPlot::ItemIcon(dnd[k].Color);
+            ImGui::SameLine();
+            ImGui::TextUnformatted(dnd[k].Label);
+            ImGui::EndDragDropSource();
+        }
+    }
+    ImGui::EndChild();
+    if (ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MY_DND"))
+        {
+            int i = *(int *)payload->Data;
+            dnd[i].Reset();
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    ImGui::SameLine();
+    if (ImPlot::BeginPlot("Singnal Plot", ImVec2(-1, 400)))
     {
         ImPlot::SetupAxesLimits(0, 1, 0, 1);
         ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"s");
+        ImPlot::SetupAxis(ImAxis_Y1, nullptr);
+        ImPlot::SetupAxis(ImAxis_Y2, nullptr);
+        ImPlot::SetupAxis(ImAxis_Y3, nullptr, ImPlotAxisFlags_Opposite);
+
+        // allow the main plot area to be a DND target
+        if (ImPlot::BeginDragDropTargetPlot())
+        {
+            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MY_DND"))
+            {
+                int i = *(int *)payload->Data;
+                dnd[i].Plt = 1;
+                dnd[i].Yax = ImAxis_Y1;
+            }
+            ImPlot::EndDragDropTarget();
+        }
+
+        // allow each y-axis to be a DND target
+        for (int y = ImAxis_Y1; y <= ImAxis_Y3; ++y)
+        {
+            if (ImPlot::BeginDragDropTargetAxis(y))
+            {
+                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MY_DND"))
+                {
+                    int i = *(int *)payload->Data;
+                    dnd[i].Plt = 1;
+                    dnd[i].Yax = y;
+                }
+                ImPlot::EndDragDropTarget();
+            }
+        }
+        // allow the legend to be a DND target
+        if (ImPlot::BeginDragDropTargetLegend())
+        {
+            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MY_DND"))
+            {
+                int i = *(int *)payload->Data;
+                dnd[i].Plt = 1;
+                dnd[i].Yax = ImAxis_Y1;
+            }
+            ImPlot::EndDragDropTarget();
+        }
 
         int64_t plot_t_min = (size_t)(ImPlot::GetPlotLimits().X.Min * data_freq);
         int64_t plot_t_max = (size_t)(ImPlot::GetPlotLimits().X.Max * data_freq) + 3;
@@ -831,72 +981,66 @@ void Demo_TimeScale()
 
         size_t count = size / stride;
 
-        static bool one_time_run = true;
-        static size_t channel_num = channels.size();
-        static std::vector<int8_t> channel_enable_colors;
-        static std::vector<ImVec4> channel_colors;
-        static std::vector<float> channel_alphas;
-        static std::vector<float> channel_thickness;
-        static std::vector<int8_t> channel_markers;
-        static std::vector<int8_t> channel_shaded;
-
-        if (one_time_run)
-        {
-            one_time_run = false;
-            for (int i = 0; i < channel_num; i++)
-            {
-                channel_enable_colors.push_back(0);
-                channel_colors.push_back(ImVec4(1, 1, 0, 1));
-                channel_alphas.push_back(1.0f);
-                channel_thickness.push_back(1.0f);
-                channel_markers.push_back(false);
-                channel_shaded.push_back(false);
-            }
-        }
-
         for (const auto &channel : channels)
         {
-            WaveData data5(base, channel.id, stride, plot_t_min);
-            if (channel_markers[channel.id])
+            if (dnd[channel.id].Plt == 1)
             {
-                ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, channel_alphas[channel.id]);
-                ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
-            }
+                // allow legend item labels to be DND sources
+                if (ImPlot::BeginDragDropSourceItem(dnd[channel.id].Label)) {
+                    ImGui::SetDragDropPayload("MY_DND", &channel.id, sizeof(int));
+                    ImPlot::ItemIcon(dnd[channel.id].Color); ImGui::SameLine();
+                    ImGui::TextUnformatted(dnd[channel.id].Label);
+                    ImPlot::EndDragDropSource();
+                }
+                ImPlot::SetAxis(dnd[channel.id].Yax);
+                WaveData data5(base, channel.id, stride, plot_t_min);
+                if (dnd[channel.id].markers)
+                {
+                    ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, dnd[channel.id].alpha);
+                    ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
+                }
 
-            if (channel_enable_colors[channel.id])
-            {
-                ImPlot::SetNextLineStyle(channel_colors[channel.id], channel_thickness[channel.id]);
-            }
-            else
-            {
-                ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, channel_thickness[channel.id]);
-            }
-            ImPlot::PlotLineG(channel.name, DataWave, &data5, count);
-            auto lamda = [](int idx, void *data)
-            {
-                WaveData *wd = (WaveData *)data;
-                return ImPlotPoint((wd->plot_min + idx * wd->stride) / data_freq, 0);
-            };
-            if (channel_shaded[channel.id])
-                ImPlot::PlotShadedG(channel.name, DataWave, &data5, lamda, &data5, count);
-            // custom legend context menu
-            if (ImPlot::BeginLegendPopup(channel.name))
-            {
-                ImGui::Checkbox("Color", (bool *)(&(channel_enable_colors[channel.id])));
-                if (channel_enable_colors[channel.id])
+                if (dnd[channel.id].color_enable)
                 {
-                    ImGui::SameLine();
-                    ImGui::ColorEdit3("Color", &channel_colors[channel.id].x);
+                    ImPlot::SetNextLineStyle(dnd[channel.id].Color, dnd[channel.id].thickness);
                 }
-                ImGui::SliderFloat("Thickness", &(channel_thickness[channel.id]), 0, 5);
-                ImGui::Checkbox("Markers", (bool *)&(channel_markers[channel.id]));
-                if (channel_markers[channel.id])
+                else
                 {
-                    ImGui::SameLine();
-                    ImGui::SliderFloat("Transparency", &(channel_alphas[channel.id]), 0, 1, "%.2f");
+                    ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, dnd[channel.id].thickness);
                 }
-                ImGui::Checkbox("Shaded", (bool *)&(channel_shaded[channel.id]));
-                ImPlot::EndLegendPopup();
+                ImPlot::PlotLineG(channel.name, DataWave, &data5, count);
+                auto lamda = [](int idx, void *data)
+                {
+                    WaveData *wd = (WaveData *)data;
+                    return ImPlotPoint((wd->plot_min + idx * wd->stride) / data_freq, 0);
+                };
+                if (dnd[channel.id].shaded)
+                    ImPlot::PlotShadedG(channel.name, DataWave, &data5, lamda, &data5, count);
+                // custom legend context menu
+                if (ImPlot::BeginLegendPopup(channel.name))
+                {
+                    ImGui::Checkbox("Color", &dnd[channel.id].color_enable);
+                    if (dnd[channel.id].color_enable)
+                    {
+                        ImGui::SameLine();
+                        ImGui::ColorEdit3("Color", &dnd[channel.id].Color.x);
+                    }
+                    ImGui::PushItemWidth(100);
+                    ImGui::SliderFloat("Thickness", &(dnd[channel.id].thickness), 0, 5);
+                    ImGui::PopItemWidth();
+                    ImGui::SameLine();
+                    ImGui::PushItemWidth(100);
+                    ImGui::SliderFloat("Line transparency", &(dnd[channel.id].Color.w), 0, 1);
+                    ImGui::PopItemWidth();
+                    ImGui::Checkbox("Markers", &dnd[channel.id].markers);
+                    if (dnd[channel.id].markers)
+                    {
+                        ImGui::SameLine();
+                        ImGui::SliderFloat("Transparency", &dnd[channel.id].alpha, 0, 1, "%.2f");
+                    }
+                    ImGui::Checkbox("Shaded", &dnd[channel.id].shaded);
+                    ImPlot::EndLegendPopup();
+                }
             }
         }
         ImPlot::EndPlot();
