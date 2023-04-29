@@ -510,9 +510,13 @@ void stop_socket()
         std::cout << "send failed: " << error.message() << std::endl;
     }
     stop_transfer = true;
-    t1.join();
-    printf("\nprocess join\n");
+    if (t1.joinable())
+    {
+        t1.join();
+        printf("\nprocess join\n");
+    }
 }
+
 int main()
 {
     std::string code_str =
