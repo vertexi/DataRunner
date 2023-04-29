@@ -626,36 +626,78 @@ int main()
         ImGui::SameLine();
         static std::thread t1;
         static std::string start_button_string = "Start";
+        static bool connect_error = false;
+        static std::string connect_error_msg;
         if (ImGui::Button(start_button_string.data()))
         {
-            if (stop_transfer)
+            do
             {
-                // connection
-                data_socket.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(ip_addr), port));
-                // data_socket.set_option(asio::detail::socket_option::integer<SOL_SOCKET, SO_RCVTIMEO>{200});
-                t1 = std::thread(dataquery);
-                stop_transfer = false;
-                start_button_string = "Stop";
-            }
-            else
-            {
-                asio::error_code error;
-                const std::string end_msg = "end!!";
-                asio::write(data_socket, asio::buffer(end_msg), error);
-                if (!error)
+                if (stop_transfer)
                 {
-                    std::cout << "\nClient sent end message!" << std::endl;
+                    try
+                    {
+                        // connection
+                        data_socket.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(ip_addr), port));
+                    }
+                    catch (std::exception &e)
+                    {
+                        std::cerr << e.what() << std::endl;
+                        connect_error_msg = e.what();
+                        connect_error = true;
+                        break;
+                    }
+                    // data_socket.set_option(asio::detail::socket_option::integer<SOL_SOCKET, SO_RCVTIMEO>{200});
+                    t1 = std::thread(dataquery);
+                    stop_transfer = false;
+                    start_button_string = "Stop";
                 }
                 else
                 {
-                    std::cout << "send failed: " << error.message() << std::endl;
-                }
-                stop_transfer = true;
-                start_button_string = "Start";
-                t1.join();
+                    asio::error_code error;
+                    const std::string end_msg = "end!!";
+                    asio::write(data_socket, asio::buffer(end_msg), error);
+                    if (!error)
+                    {
+                        std::cout << "\nClient sent end message!" << std::endl;
+                    }
+                    else
+                    {
+                        std::cout << "send failed: " << error.message() << std::endl;
+                    }
+                    stop_transfer = true;
+                    start_button_string = "Start";
+                    t1.join();
 
-                printf("\njoin\n");
+                    printf("\njoin\n");
+                }
+            } while (0);
+        }
+
+        if (connect_error)
+            ImGui::OpenPopup("connect?");
+
+        // Always center this window when appearing
+        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+        if (ImGui::BeginPopupModal("connect?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::Text("Seems that connect wrong.");
+            ImGui::Text("Error: %s", connect_error_msg.data());
+            ImGui::Separator();
+
+            static bool dont_ask_me_next_time = false;
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+            ImGui::Checkbox("Don't ask me next time", &dont_ask_me_next_time);
+            ImGui::PopStyleVar();
+
+            if (ImGui::Button("OK", ImVec2(120, 0)))
+            {
+                connect_error = false;
+                ImGui::CloseCurrentPopup();
             }
+            ImGui::SetItemDefaultFocus();
+            ImGui::EndPopup();
         }
 
         ImGui::SameLine();
@@ -829,17 +871,19 @@ static const ImU32 Dark_Data[9] = {
     4290740727,
     4288256409};
 
+#define MAX_SUBPLOTS 4
 void Demo_TimeScale()
 {
 
     static bool one_time_run = true;
     static size_t channel_num = channels.size();
 
-    // convenience struct to manage DND items; do this however you like
+    // manage each channel plot configuration
     struct MyDndItem
     {
         int Plt;
-        int plot_idx;
+        int plot_row;
+        int plot_col;
         ImAxis Yax;
         char Label[100];
         bool color_enable;
@@ -852,7 +896,8 @@ void Demo_TimeScale()
         MyDndItem(char *name, ImVec4 color)
         {
             Plt = 0;
-            plot_idx = 0;
+            plot_row = 0;
+            plot_col = 0;
             Yax = ImAxis_Y1;
             Color = color;
             alpha = 1.0f;
@@ -871,6 +916,7 @@ void Demo_TimeScale()
 
     static std::vector<MyDndItem> dnd;
 
+    // initialize each channel plot configuration
     if (one_time_run)
     {
         one_time_run = false;
@@ -887,24 +933,25 @@ void Demo_TimeScale()
         }
     }
 
+    // control the subplot layout
     static int rows = 3;
     static int cols = 3;
 
     if (ImGui::Button("Subplot Layout"))
         ImGui::OpenPopup("Layout_popup");
 
-    static char selected[4][4] = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
+    static char layout_selected[MAX_SUBPLOTS][MAX_SUBPLOTS] = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
     static char lay_selection_string[10];
     if (ImGui::BeginPopup("Layout_popup"))
     {
-        for (int y = 0; y < 4; y++)
-            for (int x = 0; x < 4; x++)
+        for (int y = 0; y < MAX_SUBPLOTS; y++)
+            for (int x = 0; x < MAX_SUBPLOTS; x++)
             {
                 if (x > 0)
                     ImGui::SameLine();
-                ImGui::PushID(y * 4 + x);
+                ImGui::PushID(y * MAX_SUBPLOTS + x);
                 snprintf(lay_selection_string, sizeof(lay_selection_string), "(%dx%d)", y + 1, x + 1);
-                if (ImGui::Selectable(lay_selection_string, selected[y][x] != 0, 0, ImVec2(50, 50)))
+                if (ImGui::Selectable(lay_selection_string, layout_selected[y][x] != 0, 0, ImVec2(50, 50)))
                 {
                     rows = y + 1;
                     cols = x + 1;
@@ -912,7 +959,7 @@ void Demo_TimeScale()
                     {
                         for (int row = 0; row < rows; row++)
                         {
-                            selected[row][col] = 1;
+                            layout_selected[row][col] = 1;
                         }
                     }
                 }
@@ -921,7 +968,7 @@ void Demo_TimeScale()
         ImGui::EndPopup();
     }
 
-    // child window to serve as initial source for our DND items
+    // control the channel drag and drop labels
     ImGui::BeginChild("DND_LEFT", ImVec2(100, 400));
     if (ImGui::Button("Reset Data"))
     {
@@ -956,178 +1003,187 @@ void Demo_TimeScale()
         ImGui::EndDragDropTarget();
     }
 
+    // start drop subplot
     static int plot_height = 800;
     ImGui::SameLine();
     if (ImPlot::BeginSubplots("##ItemSharing", rows, cols, ImVec2(-20.0f, plot_height)))
     {
-        for (int plot_id = 0; plot_id < rows * cols; ++plot_id)
+        for (int plot_col = 0; plot_col < cols; ++plot_col)
         {
-            if (ImPlot::BeginPlot("", ImVec2(-1, 400)))
+            for (int plot_row = 0; plot_row < rows; ++plot_row)
             {
-                ImPlot::SetupAxesLimits(0, 1, 0, 1);
-                ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"s");
-                ImPlot::SetupAxis(ImAxis_Y1, nullptr);
-                ImPlot::SetupAxis(ImAxis_Y2, nullptr);
-                ImPlot::SetupAxis(ImAxis_Y3, nullptr, ImPlotAxisFlags_Opposite);
-
-                // allow the main plot area to be a DND target
-                if (ImPlot::BeginDragDropTargetPlot())
+                if (ImPlot::BeginPlot("", ImVec2(-1, 400)))
                 {
-                    if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MY_DND"))
-                    {
-                        int i = *(int *)payload->Data;
-                        dnd[i].Plt = 1;
-                        dnd[i].plot_idx = plot_id;
-                        dnd[i].Yax = ImAxis_Y1;
-                    }
-                    ImPlot::EndDragDropTarget();
-                }
+                    ImPlot::SetupAxesLimits(0, 1, 0, 1);
+                    ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"s");
+                    ImPlot::SetupAxis(ImAxis_Y1, nullptr);
+                    ImPlot::SetupAxis(ImAxis_Y2, nullptr);
+                    ImPlot::SetupAxis(ImAxis_Y3, nullptr, ImPlotAxisFlags_Opposite);
 
-                // allow each y-axis to be a DND target
-                for (int y = ImAxis_Y1; y <= ImAxis_Y3; ++y)
-                {
-                    if (ImPlot::BeginDragDropTargetAxis(y))
+                    // allow the main plot area to be a DND target
+                    if (ImPlot::BeginDragDropTargetPlot())
                     {
                         if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MY_DND"))
                         {
                             int i = *(int *)payload->Data;
                             dnd[i].Plt = 1;
-                            dnd[i].plot_idx = plot_id;
-                            dnd[i].Yax = y;
+                            dnd[i].plot_col = plot_col;
+                            dnd[i].plot_row = plot_row;
+                            dnd[i].Yax = ImAxis_Y1;
                         }
                         ImPlot::EndDragDropTarget();
                     }
-                }
-                // allow the legend to be a DND target
-                if (ImPlot::BeginDragDropTargetLegend())
-                {
-                    if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MY_DND"))
+
+                    // allow each y-axis to be a DND target
+                    for (int y = ImAxis_Y1; y <= ImAxis_Y3; ++y)
                     {
-                        int i = *(int *)payload->Data;
-                        dnd[i].Plt = 1;
-                        dnd[i].plot_idx = plot_id;
-                        dnd[i].Yax = ImAxis_Y1;
-                    }
-                    ImPlot::EndDragDropTarget();
-                }
-
-                int64_t plot_t_min = (size_t)(ImPlot::GetPlotLimits().X.Min * data_freq);
-                int64_t plot_t_max = (size_t)(ImPlot::GetPlotLimits().X.Max * data_freq) + 3;
-
-                int64_t t_min = data_idx_min();
-                int64_t t_max = data_idx_max();
-
-                if (plot_t_max < t_min)
-                {
-                    printf("max %lld %lld\n", plot_t_max, t_min);
-                    ImPlot::EndPlot();
-                    return;
-                }
-
-                if (plot_t_min > t_max)
-                {
-                    printf("min %lld %lld\n", plot_t_min, t_max);
-                    ImPlot::EndPlot();
-                    return;
-                }
-
-                if (plot_t_min < t_min)
-                {
-                    plot_t_min = t_min;
-                }
-                if (plot_t_max > t_max)
-                {
-                    plot_t_max = t_max;
-                }
-
-                size_t base = 0;
-                if (packet_round > 0)
-                {
-                    base = plot_t_min - t_min + packet_idx + packet_buf_buf;
-                }
-                else
-                {
-                    base = plot_t_min - t_min;
-                }
-
-                size_t size = plot_t_max - plot_t_min;
-                size_t stride = 0;
-                if (size < 1000)
-                {
-                    stride = 1;
-                }
-                else
-                {
-                    stride = size / 1000;
-                }
-
-                size_t count = size / stride;
-
-                for (const auto &channel : channels)
-                {
-                    if (dnd[channel.id].Plt == 1 && dnd[channel.id].plot_idx == plot_id)
-                    {
-                        // allow legend item labels to be DND sources
-                        if (ImPlot::BeginDragDropSourceItem(dnd[channel.id].Label))
+                        if (ImPlot::BeginDragDropTargetAxis(y))
                         {
-                            ImGui::SetDragDropPayload("MY_DND", &channel.id, sizeof(int));
-                            ImPlot::ItemIcon(dnd[channel.id].Color);
-                            ImGui::SameLine();
-                            ImGui::TextUnformatted(dnd[channel.id].Label);
-                            ImPlot::EndDragDropSource();
-                        }
-                        ImPlot::SetAxis(dnd[channel.id].Yax);
-                        WaveData data5(base, channel.id, stride, plot_t_min);
-                        if (dnd[channel.id].markers)
-                        {
-                            ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, dnd[channel.id].alpha);
-                            ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
-                        }
-
-                        if (dnd[channel.id].color_enable)
-                        {
-                            ImPlot::SetNextLineStyle(dnd[channel.id].Color, dnd[channel.id].thickness);
-                        }
-                        else
-                        {
-                            ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, dnd[channel.id].thickness);
-                        }
-                        ImPlot::PlotLineG(channel.name, DataWave, &data5, count);
-                        auto lamda = [](int idx, void *data)
-                        {
-                            WaveData *wd = (WaveData *)data;
-                            return ImPlotPoint((wd->plot_min + idx * wd->stride) / data_freq, 0);
-                        };
-                        if (dnd[channel.id].shaded)
-                            ImPlot::PlotShadedG(channel.name, DataWave, &data5, lamda, &data5, count);
-                        // custom legend context menu
-                        if (ImPlot::BeginLegendPopup(channel.name))
-                        {
-                            ImGui::Checkbox("Color", &dnd[channel.id].color_enable);
-                            if (dnd[channel.id].color_enable)
+                            if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MY_DND"))
                             {
-                                ImGui::SameLine();
-                                ImGui::ColorEdit3("Color", &dnd[channel.id].Color.x);
+                                int i = *(int *)payload->Data;
+                                dnd[i].Plt = 1;
+                                dnd[i].plot_col = plot_col;
+                                dnd[i].plot_row = plot_row;
+                                dnd[i].Yax = y;
                             }
-                            ImGui::PushItemWidth(100);
-                            ImGui::SliderFloat("Thickness", &(dnd[channel.id].thickness), 0, 5);
-                            ImGui::PopItemWidth();
-                            ImGui::SameLine();
-                            ImGui::PushItemWidth(100);
-                            ImGui::SliderFloat("Line transparency", &(dnd[channel.id].Color.w), 0, 1);
-                            ImGui::PopItemWidth();
-                            ImGui::Checkbox("Markers", &dnd[channel.id].markers);
+                            ImPlot::EndDragDropTarget();
+                        }
+                    }
+                    // allow the legend to be a DND target
+                    if (ImPlot::BeginDragDropTargetLegend())
+                    {
+                        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("MY_DND"))
+                        {
+                            int i = *(int *)payload->Data;
+                            dnd[i].Plt = 1;
+                            dnd[i].plot_col = plot_col;
+                            dnd[i].plot_row = plot_row;
+                            dnd[i].Yax = ImAxis_Y1;
+                        }
+                        ImPlot::EndDragDropTarget();
+                    }
+
+                    // calculate the axis and real data index mapping
+                    int64_t plot_t_min = (size_t)(ImPlot::GetPlotLimits().X.Min * data_freq);
+                    int64_t plot_t_max = (size_t)(ImPlot::GetPlotLimits().X.Max * data_freq) + 3;
+
+                    int64_t t_min = data_idx_min();
+                    int64_t t_max = data_idx_max();
+
+                    if (plot_t_max < t_min)
+                    {
+                        printf("max %lld %lld\n", plot_t_max, t_min);
+                        ImPlot::EndPlot();
+                        continue;
+                    }
+
+                    if (plot_t_min > t_max)
+                    {
+                        printf("min %lld %lld\n", plot_t_min, t_max);
+                        ImPlot::EndPlot();
+                        continue;
+                    }
+
+                    if (plot_t_min < t_min)
+                    {
+                        plot_t_min = t_min;
+                    }
+                    if (plot_t_max > t_max)
+                    {
+                        plot_t_max = t_max;
+                    }
+
+                    size_t base = 0;
+                    if (packet_round > 0)
+                    {
+                        base = plot_t_min - t_min + packet_idx + packet_buf_buf;
+                    }
+                    else
+                    {
+                        base = plot_t_min - t_min;
+                    }
+
+                    size_t size = plot_t_max - plot_t_min;
+                    size_t stride = 0;
+                    if (size < 1000)
+                    {
+                        stride = 1;
+                    }
+                    else
+                    {
+                        stride = size / 1000;
+                    }
+
+                    size_t count = size / stride;
+
+                    // start plot each channel in the plot
+                    for (const auto &channel : channels)
+                    {
+                        if (dnd[channel.id].Plt == 1 && dnd[channel.id].plot_col == plot_col && dnd[channel.id].plot_row == plot_row)
+                        {
+                            // allow legend item labels to be DND sources
+                            if (ImPlot::BeginDragDropSourceItem(dnd[channel.id].Label))
+                            {
+                                ImGui::SetDragDropPayload("MY_DND", &channel.id, sizeof(int));
+                                ImPlot::ItemIcon(dnd[channel.id].Color);
+                                ImGui::SameLine();
+                                ImGui::TextUnformatted(dnd[channel.id].Label);
+                                ImPlot::EndDragDropSource();
+                            }
+                            ImPlot::SetAxis(dnd[channel.id].Yax);
+                            WaveData data5(base, channel.id, stride, plot_t_min);
                             if (dnd[channel.id].markers)
                             {
-                                ImGui::SameLine();
-                                ImGui::SliderFloat("Transparency", &dnd[channel.id].alpha, 0, 1, "%.2f");
+                                ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, dnd[channel.id].alpha);
+                                ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
                             }
-                            ImGui::Checkbox("Shaded", &dnd[channel.id].shaded);
-                            ImPlot::EndLegendPopup();
+
+                            if (dnd[channel.id].color_enable)
+                            {
+                                ImPlot::SetNextLineStyle(dnd[channel.id].Color, dnd[channel.id].thickness);
+                            }
+                            else
+                            {
+                                ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, dnd[channel.id].thickness);
+                            }
+                            ImPlot::PlotLineG(channel.name, DataWave, &data5, count);
+                            auto lamda = [](int idx, void *data)
+                            {
+                                WaveData *wd = (WaveData *)data;
+                                return ImPlotPoint((wd->plot_min + idx * wd->stride) / data_freq, 0);
+                            };
+                            if (dnd[channel.id].shaded)
+                                ImPlot::PlotShadedG(channel.name, DataWave, &data5, lamda, &data5, count);
+                            // custom legend context menu
+                            if (ImPlot::BeginLegendPopup(channel.name))
+                            {
+                                ImGui::Checkbox("Color", &dnd[channel.id].color_enable);
+                                if (dnd[channel.id].color_enable)
+                                {
+                                    ImGui::SameLine();
+                                    ImGui::ColorEdit3("Color", &dnd[channel.id].Color.x);
+                                }
+                                ImGui::PushItemWidth(100);
+                                ImGui::SliderFloat("Thickness", &(dnd[channel.id].thickness), 0, 5);
+                                ImGui::PopItemWidth();
+                                ImGui::SameLine();
+                                ImGui::PushItemWidth(100);
+                                ImGui::SliderFloat("Line transparency", &(dnd[channel.id].Color.w), 0, 1);
+                                ImGui::PopItemWidth();
+                                ImGui::Checkbox("Markers", &dnd[channel.id].markers);
+                                if (dnd[channel.id].markers)
+                                {
+                                    ImGui::SameLine();
+                                    ImGui::SliderFloat("Transparency", &dnd[channel.id].alpha, 0, 1, "%.2f");
+                                }
+                                ImGui::Checkbox("Shaded", &dnd[channel.id].shaded);
+                                ImPlot::EndLegendPopup();
+                            }
                         }
                     }
+                    ImPlot::EndPlot();
                 }
-                ImPlot::EndPlot();
             }
         }
         ImPlot::EndSubplots();
@@ -1148,6 +1204,7 @@ void Demo_TimeScale()
 
 // TODO: cursor delta-x
 // TODO: Config window and dataform
+// TODO: Find max, min, mean, frequency
 // TODO: magnifier
 // TODO: multiple draw in subplot for a single signal
 // TODO: data saving
