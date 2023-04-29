@@ -494,6 +494,25 @@ int MetricFormatter_orig(double value, char *buff, int size, void *data)
 static void ShowLogWindow(bool *p_open);
 void Demo_TimeScale();
 std::vector<data_channel> channels;
+static std::thread t1;
+
+void stop_socket()
+{
+    asio::error_code error;
+    const std::string end_msg = "end!!";
+    asio::write(data_socket, asio::buffer(end_msg), error);
+    if (!error)
+    {
+        std::cout << "\nClient sent end message!" << std::endl;
+    }
+    else
+    {
+        std::cout << "send failed: " << error.message() << std::endl;
+    }
+    stop_transfer = true;
+    t1.join();
+    printf("\nprocess join\n");
+}
 int main()
 {
     std::string code_str =
@@ -624,7 +643,6 @@ int main()
         ImGui::PopItemWidth();
 
         ImGui::SameLine();
-        static std::thread t1;
         static std::string start_button_string = "Start";
         static bool connect_error = false;
         static std::string connect_error_msg;
@@ -653,22 +671,8 @@ int main()
                 }
                 else
                 {
-                    asio::error_code error;
-                    const std::string end_msg = "end!!";
-                    asio::write(data_socket, asio::buffer(end_msg), error);
-                    if (!error)
-                    {
-                        std::cout << "\nClient sent end message!" << std::endl;
-                    }
-                    else
-                    {
-                        std::cout << "send failed: " << error.message() << std::endl;
-                    }
-                    stop_transfer = true;
+                    stop_socket();
                     start_button_string = "Start";
-                    t1.join();
-
-                    printf("\njoin\n");
                 }
             } while (0);
         }
@@ -692,7 +696,7 @@ int main()
             ImGui::PopStyleVar();
 
             ImGui::Text("");
-            ImGui::SameLine(ImGui::GetWindowWidth()/2 - 120/2);
+            ImGui::SameLine(ImGui::GetWindowWidth() / 2 - 120 / 2);
             if (ImGui::Button("OK", ImVec2(120, 0)))
             {
                 connect_error = false;
@@ -729,6 +733,8 @@ int main()
 
         glfwSwapBuffers(window);
     }
+
+    stop_socket();
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
