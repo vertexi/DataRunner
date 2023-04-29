@@ -601,7 +601,7 @@ int main()
             ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
             ImGui::SameLine();
             static char memory_string[100];
-            MetricFormatter_orig(data_buf_idx, memory_string, sizeof(memory_string), (void *)"B");
+            MetricFormatter_orig((double)data_buf_idx, memory_string, sizeof(memory_string), (void *)"B");
             ImGui::Text("packet num: %lld/%lld, memory usage: %s", packet_idx, packet_max, memory_string);
         }
         else
@@ -691,6 +691,8 @@ int main()
             ImGui::Checkbox("Don't ask me next time", &dont_ask_me_next_time);
             ImGui::PopStyleVar();
 
+            ImGui::Text("");
+            ImGui::SameLine(ImGui::GetWindowWidth()/2 - 120/2);
             if (ImGui::Button("OK", ImVec2(120, 0)))
             {
                 connect_error = false;
@@ -766,11 +768,11 @@ static void ShowLogWindow(bool *p_open)
         ImGuiListClipper clipper;
         if (packet_round == 0)
         {
-            clipper.Begin(packet_idx);
+            clipper.Begin((int)packet_idx);
         }
         else
         {
-            clipper.Begin(packet_max - packet_buf_buf);
+            clipper.Begin((int)(packet_max - packet_buf_buf));
         }
         char string_buf[1000];
         int16_t string_buf_idx = 0;
@@ -832,13 +834,38 @@ ImPlotPoint DataWave(int idx, void *data)
     double time = (wd->plot_min + idx * wd->stride) / data_freq;
     switch (channels[wd->id].data_type)
     {
+    case DataType::DataType_int8_t:
+        return ImPlotPoint(time, *((int8_t *)data_pos));
+        break;
+    case DataType::DataType_int16_t:
+        return ImPlotPoint(time, *((int16_t *)data_pos));
+        break;
+    case DataType::DataType_int32_t:
+        return ImPlotPoint(time, *((int32_t *)data_pos));
+        break;
+    case DataType::DataType_int64_t:
+        return ImPlotPoint(time, (double)(*((int64_t *)data_pos)));
+        break;
     case DataType::DataType_uint8_t:
         return ImPlotPoint(time, *((uint8_t *)data_pos));
+        break;
+    case DataType::DataType_uint16_t:
+        return ImPlotPoint(time, *((uint16_t *)data_pos));
+        break;
+    case DataType::DataType_uint32_t:
+        return ImPlotPoint(time, *((uint32_t *)data_pos));
+        break;
+    case DataType::DataType_uint64_t:
+        return ImPlotPoint(time, (double)(*((uint64_t *)data_pos)));
         break;
     case DataType::DataType_float:
         return ImPlotPoint(time, *((float *)data_pos));
         break;
+    case DataType::DataType_double:
+        return ImPlotPoint(time, *((double *)data_pos));
+        break;
     default:
+        return ImPlotPoint(time, NAN);
         break;
     }
 }
@@ -1006,7 +1033,7 @@ void Demo_TimeScale()
     // start drop subplot
     static int plot_height = 800;
     ImGui::SameLine();
-    if (ImPlot::BeginSubplots("##ItemSharing", rows, cols, ImVec2(-20.0f, plot_height)))
+    if (ImPlot::BeginSubplots("##ItemSharing", rows, cols, ImVec2(-20.0f, (float)plot_height)))
     {
         for (int plot_col = 0; plot_col < cols; ++plot_col)
         {
@@ -1147,14 +1174,14 @@ void Demo_TimeScale()
                             {
                                 ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, dnd[channel.id].thickness);
                             }
-                            ImPlot::PlotLineG(channel.name, DataWave, &data5, count);
+                            ImPlot::PlotLineG(channel.name, DataWave, &data5, (int)count);
                             auto lamda = [](int idx, void *data)
                             {
                                 WaveData *wd = (WaveData *)data;
                                 return ImPlotPoint((wd->plot_min + idx * wd->stride) / data_freq, 0);
                             };
                             if (dnd[channel.id].shaded)
-                                ImPlot::PlotShadedG(channel.name, DataWave, &data5, lamda, &data5, count);
+                                ImPlot::PlotShadedG(channel.name, DataWave, &data5, lamda, &data5, (int)count);
                             // custom legend context menu
                             if (ImPlot::BeginLegendPopup(channel.name))
                             {
