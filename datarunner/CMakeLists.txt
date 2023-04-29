@@ -1,5 +1,8 @@
 add_executable(DataRunner datarunner.cpp)
 
+add_subdirectory(implot)
+target_link_libraries(DataRunner PUBLIC implot)
+
 find_package(glad CONFIG REQUIRED)
 target_link_libraries(DataRunner PRIVATE glad::glad)
 
@@ -11,8 +14,8 @@ target_link_libraries(DataRunner PRIVATE glfw)
 find_package(imgui CONFIG REQUIRED)
 target_link_libraries(DataRunner PRIVATE imgui::imgui)
 
-find_package(implot CONFIG REQUIRED)
-target_link_libraries(DataRunner PRIVATE implot::implot)
+# find_package(implot CONFIG REQUIRED)
+# target_link_libraries(DataRunner PRIVATE implot::implot)
 
 find_package(asio CONFIG REQUIRED)
 target_link_libraries(DataRunner PRIVATE asio asio::asio)
