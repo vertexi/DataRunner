@@ -460,8 +460,32 @@ int MetricFormatter(double value, char *buff, int size, void *data)
             else
             {
                 int temp = snprintf(buff, size, "%lld%s%s", (int64_t)value / (int64_t)v[i], p[i], unit);
-                return MetricFormatter((value - (int64_t)value), buff + temp, size - temp, data);
+                double temp_value = (value - (int64_t)value);
+                if (temp_value != 0)
+                {
+                    return MetricFormatter(temp_value, buff + temp, size - temp, data);
+                }
+                return temp;
             }
+        }
+    }
+    return snprintf(buff, size, "%g %s%s", value / v[6], p[6], unit);
+}
+
+int MetricFormatter_orig(double value, char *buff, int size, void *data)
+{
+    const char *unit = (const char *)data;
+    static double v[] = {1000000000, 1000000, 1000, 1, 0.001, 0.000001, 0.000000001};
+    static const char *p[] = {"G", "M", "k", "", "m", "u", "n"};
+    if (value == 0)
+    {
+        return snprintf(buff, size, "0 %s", unit);
+    }
+    for (int i = 0; i < 7; ++i)
+    {
+        if (fabs(value) >= v[i])
+        {
+            return snprintf(buff, size, "%g %s%s", value / v[i], p[i], unit);
         }
     }
     return snprintf(buff, size, "%g %s%s", value / v[6], p[6], unit);
@@ -570,12 +594,24 @@ int main()
         }
 
         static float progress = 0.0f;
-        progress = (float)data_buf_idx / DATA_BUF_SIZE;
-        ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
-        ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-        ImGui::Text("Progress Bar");
-
-        ImGui::Text("packet num: %lld, bytes: %lld", packet_idx, data_buf_idx);
+        ImGui::PushItemWidth(220);
+        if (packet_round == 0)
+        {
+            progress = (float)data_buf_idx / DATA_BUF_SIZE;
+            ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
+            ImGui::SameLine();
+            static char memory_string[100];
+            MetricFormatter_orig(data_buf_idx, memory_string, sizeof(memory_string), (void *)"B");
+            ImGui::Text("packet num: %lld/%lld, memory usage: %s", packet_idx, packet_max, memory_string);
+        }
+        else
+        {
+            progress = 1.0f;
+            ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
+            ImGui::SameLine();
+            ImGui::Text("packet num: %lld/%lld, bytes: %lld", packet_max, packet_max, data_buf_idx);
+        }
+        ImGui::PushItemWidth(0);
 
         ImGui::PushItemWidth(160);
         static char ip_addr[128] = "192.168.1.2";
@@ -624,7 +660,7 @@ int main()
 
         ImGui::SameLine();
         static char frequency_string[100];
-        MetricFormatter(data_freq, frequency_string, 100, (void *)"Hz");
+        MetricFormatter_orig(data_freq, frequency_string, 100, (void *)"Hz");
         ImGui::PushItemWidth(120);
         ImGui::DragFloat("data frequency", &data_freq, 1000.0f, 0.0f, 100000.0f, frequency_string);
         ImGui::PopItemWidth();
@@ -867,11 +903,11 @@ void Demo_TimeScale()
                 if (x > 0)
                     ImGui::SameLine();
                 ImGui::PushID(y * 4 + x);
-                snprintf(lay_selection_string, sizeof(lay_selection_string), "(%dx%d)", y+1, x+1);
+                snprintf(lay_selection_string, sizeof(lay_selection_string), "(%dx%d)", y + 1, x + 1);
                 if (ImGui::Selectable(lay_selection_string, selected[y][x] != 0, 0, ImVec2(50, 50)))
                 {
-                    rows = y+1;
-                    cols = x+1;
+                    rows = y + 1;
+                    cols = x + 1;
                     for (int col = 0; col < cols; col++)
                     {
                         for (int row = 0; row < rows; row++)
@@ -920,8 +956,9 @@ void Demo_TimeScale()
         ImGui::EndDragDropTarget();
     }
 
+    static int plot_height = 800;
     ImGui::SameLine();
-    if (ImPlot::BeginSubplots("##ItemSharing", rows, cols, ImVec2(-1, 800)))
+    if (ImPlot::BeginSubplots("##ItemSharing", rows, cols, ImVec2(-20.0f, plot_height)))
     {
         for (int plot_id = 0; plot_id < rows * cols; ++plot_id)
         {
@@ -1095,4 +1132,24 @@ void Demo_TimeScale()
         }
         ImPlot::EndSubplots();
     }
+
+    ImGui::PushID("vsliderforplot");
+    ImGui::SameLine();
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor::HSV(4 / 7.0f, 0.5f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, (ImVec4)ImColor::HSV(4 / 7.0f, 0.6f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, (ImVec4)ImColor::HSV(4 / 7.0f, 0.7f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_SliderGrab, (ImVec4)ImColor::HSV(4 / 7.0f, 0.9f, 0.9f));
+    ImGui::VSliderInt("##v", ImVec2(18, 400), &plot_height, 400, 2000, "");
+    if (ImGui::IsItemActive() || ImGui::IsItemHovered())
+        ImGui::SetTooltip("height: %d", plot_height);
+    ImGui::PopStyleColor(4);
+    ImGui::PopID();
 }
+
+// TODO: cursor delta-x
+// TODO: Config window and dataform
+// TODO: magnifier
+// TODO: multiple draw in subplot for a single signal
+// TODO: data saving
+// TODO: image export
+// TODO: Math expression
