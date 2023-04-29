@@ -590,6 +590,7 @@ int main()
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     static bool show_log_window = false;
+    static bool show_implot_metrics = false;
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
@@ -608,12 +609,18 @@ int main()
         ImGui::Begin("Hello, world!", nullptr, ImGuiWindowFlags_MenuBar); // Create a window called "Hello, world!" and append into it.
         if (ImGui::BeginMenuBar())
         {
-            if (ImGui::BeginMenu("Examples"))
+            if (ImGui::BeginMenu("Tools"))
             {
                 ImGui::MenuItem("Show log window", NULL, &show_log_window);
+                ImGui::MenuItem("Metrics", nullptr, &show_implot_metrics);
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
+        }
+
+        if (show_implot_metrics)
+        {
+            ImPlot::ShowMetricsWindow(&show_implot_metrics);
         }
 
         static float progress = 0.0f;
@@ -992,11 +999,18 @@ void Demo_TimeScale()
                 {
                     rows = y + 1;
                     cols = x + 1;
-                    for (int col = 0; col < cols; col++)
+                    for (int col = 0; col < MAX_SUBPLOTS; col++)
                     {
-                        for (int row = 0; row < rows; row++)
+                        for (int row = 0; row < MAX_SUBPLOTS; row++)
                         {
-                            layout_selected[row][col] = 1;
+                            if (row < rows && col < cols)
+                            {
+                                layout_selected[row][col] = 1;
+                            }
+                            else
+                            {
+                                layout_selected[row][col] = 0;
+                            }
                         }
                     }
                 }
@@ -1045,9 +1059,9 @@ void Demo_TimeScale()
     ImGui::SameLine();
     if (ImPlot::BeginSubplots("##ItemSharing", rows, cols, ImVec2(-20.0f, (float)plot_height)))
     {
-        for (int plot_col = 0; plot_col < cols; ++plot_col)
+        for (int plot_row = 0; plot_row < rows; ++plot_row)
         {
-            for (int plot_row = 0; plot_row < rows; ++plot_row)
+            for (int plot_col = 0; plot_col < cols; ++plot_col)
             {
                 if (ImPlot::BeginPlot("", ImVec2(-1, 400)))
                 {
