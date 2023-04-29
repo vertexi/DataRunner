@@ -591,6 +591,9 @@ int main()
 
     static bool show_log_window = false;
     static bool show_implot_metrics = false;
+    static bool show_implot_style_editor = false;
+    static bool show_imgui_metrics = false;
+    static bool show_imgui_style_editor = false;
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
@@ -612,7 +615,11 @@ int main()
             if (ImGui::BeginMenu("Tools"))
             {
                 ImGui::MenuItem("Show log window", NULL, &show_log_window);
-                ImGui::MenuItem("Metrics", nullptr, &show_implot_metrics);
+                ImGui::MenuItem("ImPlot Metrics", nullptr, &show_implot_metrics);
+                ImGui::MenuItem("ImPlot Style Editor", nullptr, &show_implot_style_editor);
+                ImGui::Separator();
+                ImGui::MenuItem("ImGui Metrics", nullptr, &show_imgui_metrics);
+                ImGui::MenuItem("ImGui Style Editor", nullptr, &show_imgui_style_editor);
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
@@ -621,6 +628,24 @@ int main()
         if (show_implot_metrics)
         {
             ImPlot::ShowMetricsWindow(&show_implot_metrics);
+        }
+
+        if (show_implot_style_editor)
+        {
+            ImGui::SetNextWindowSize(ImVec2(415, 762), ImGuiCond_Appearing);
+            ImGui::Begin("Style Editor (ImPlot)", &show_implot_style_editor);
+            ImPlot::ShowStyleEditor();
+            ImGui::End();
+        }
+        if (show_imgui_style_editor)
+        {
+            ImGui::Begin("Style Editor (ImGui)", &show_imgui_style_editor);
+            ImGui::ShowStyleEditor();
+            ImGui::End();
+        }
+        if (show_imgui_metrics)
+        {
+            ImGui::ShowMetricsWindow(&show_imgui_metrics);
         }
 
         static float progress = 0.0f;
@@ -1016,8 +1041,8 @@ void Demo_TimeScale()
                 }
                 if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
                 {
-                    ImGui::SetDragDropPayload("subplot_DND", &ImVec2(y, x), sizeof(ImVec2));
-                    ImGui::Text("(%d,%d)", y+1, x+1);
+                    ImGui::SetDragDropPayload("subplot_DND", &ImVec2((float)y, (float)x), sizeof(ImVec2));
+                    ImGui::Text("(%d,%d)", y + 1, x + 1);
                     ImGui::EndDragDropSource();
                 }
                 if (ImGui::BeginDragDropTarget())
@@ -1031,9 +1056,11 @@ void Demo_TimeScale()
                             {
                                 dnd[i].plot_col = x;
                                 dnd[i].plot_row = y;
-                            } else if (dnd[i].Plt == 1 && dnd[i].plot_col == x && dnd[i].plot_row == y){
-                                dnd[i].plot_col = colrow.y;
-                                dnd[i].plot_row = colrow.x;
+                            }
+                            else if (dnd[i].Plt == 1 && dnd[i].plot_col == x && dnd[i].plot_row == y)
+                            {
+                                dnd[i].plot_col = (int)colrow.y;
+                                dnd[i].plot_row = (int)colrow.x;
                             }
                         }
                     }
