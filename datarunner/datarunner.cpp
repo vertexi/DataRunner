@@ -1014,6 +1014,31 @@ void Demo_TimeScale()
                         }
                     }
                 }
+                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+                {
+                    ImGui::SetDragDropPayload("subplot_DND", &ImVec2(y, x), sizeof(ImVec2));
+                    ImGui::Text("(%d,%d)", y+1, x+1);
+                    ImGui::EndDragDropSource();
+                }
+                if (ImGui::BeginDragDropTarget())
+                {
+                    if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("subplot_DND"))
+                    {
+                        ImVec2 colrow = *(ImVec2 *)payload->Data;
+                        for (int i = 0; i < channel_num; i++)
+                        {
+                            if (dnd[i].Plt == 1 && dnd[i].plot_col == colrow.y && dnd[i].plot_row == colrow.x)
+                            {
+                                dnd[i].plot_col = x;
+                                dnd[i].plot_row = y;
+                            } else if (dnd[i].Plt == 1 && dnd[i].plot_col == x && dnd[i].plot_row == y){
+                                dnd[i].plot_col = colrow.y;
+                                dnd[i].plot_row = colrow.x;
+                            }
+                        }
+                    }
+                    ImGui::EndDragDropTarget();
+                }
                 ImGui::PopID();
             }
         ImGui::EndPopup();
@@ -1261,3 +1286,10 @@ void Demo_TimeScale()
 // TODO: data saving
 // TODO: image export
 // TODO: Math expression
+
+// features:
+// TODO: logic analyser
+// TODO: system analyser
+// TODO: code generator and simulation(separate program)
+
+// do a general data plotter separate the data protocol
