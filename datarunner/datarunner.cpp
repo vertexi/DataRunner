@@ -572,34 +572,56 @@ int main()
     ImPlot::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
 
-    // // chinese font
-    // static const ImWchar chinese_ranges[] =
-    //     {
-    //         0x2000,
-    //         0x206F, // General Punctuation
-    //         0x3000,
-    //         0x30FF, // CJK Symbols and Punctuations, Hiragana, Katakana
-    //         0x31F0,
-    //         0x31FF, // Katakana Phonetic Extensions
-    //         0xFF00,
-    //         0xFFEF, // Half-width characters
-    //         0xFFFD,
-    //         0xFFFD, // Invalid
-    //         0x4e00,
-    //         0x9FAF, // CJK Ideograms
-    //         0,
-    //     };
-    // ImFontConfig config;
-    // config.MergeMode = true;
-    // config.OversampleH = 2;
-    // config.OversampleV = 2;
-    // config.GlyphExtraSpacing.x = 1.0f;
-    // io.Fonts->AddFontDefault();
-    // // io.Fonts->AddFontFromFileTTF("Zpix.ttf", 20.0f, &config, io.Fonts->GetGlyphRangesChineseFull());
-    // io.Fonts->AddFontFromFileTTF("yahei.ttf", 20.0f, &config, io.Fonts->GetGlyphRangesChineseFull());
-    // // io.Fonts->AddFontFromFileTTF("NotoSansSC-Regular.otf", 20.0f, &config, io.Fonts->GetGlyphRangesChineseFull());
-    // io.Fonts->Build();
-    // // chinese font
+    char prog_directory[256];
+    size_t len = sizeof(prog_directory);
+// _WIN32 = we're in windows
+#ifdef _WIN32
+    // Windows
+    int bytes = GetModuleFileName(NULL, prog_directory, len);
+    char *lastBackslash = strrchr(prog_directory, '\\');
+    if (lastBackslash != NULL)
+    {
+        *(lastBackslash + 1) = '\0'; // add null terminator after last backslash
+    }
+#else
+    // Not windows
+    int bytes = MIN(readlink("/proc/self/exe", prog_directory, len), len - 1);
+    if (bytes >= 0)
+        prog_directory[bytes] = '\0';
+#endif
+
+    // chinese font
+    static const ImWchar chinese_ranges[] =
+        {
+            0x2000,
+            0x206F, // General Punctuation
+            0x3000,
+            0x30FF, // CJK Symbols and Punctuations, Hiragana, Katakana
+            0x31F0,
+            0x31FF, // Katakana Phonetic Extensions
+            0xFF00,
+            0xFFEF, // Half-width characters
+            0xFFFD,
+            0xFFFD, // Invalid
+            0x4e00,
+            0x9FAF, // CJK Ideograms
+            0,
+        };
+    ImFontConfig config;
+    config.MergeMode = true;
+    config.OversampleH = 2;
+    config.OversampleV = 2;
+    config.GlyphExtraSpacing.x = 1.0f;
+    ImVector<ImWchar> ranges;
+    ImFontGlyphRangesBuilder builder;
+    builder.AddText(u8"你好呀！");
+    builder.BuildRanges(&ranges);
+    char fontFilePath[512];
+    snprintf(fontFilePath, sizeof(fontFilePath), "%sNotoSansSC-Medium.otf", prog_directory);
+    io.Fonts->AddFontDefault();
+    io.Fonts->AddFontFromFileTTF(fontFilePath, 20.0f, &config, ranges.Data);
+    io.Fonts->Build();
+    // chinese font
 
     (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
@@ -1033,8 +1055,8 @@ void Demo_TimeScale()
     }
 
     // control the subplot layout
-    static int rows = 3;
-    static int cols = 3;
+    static int rows = 1;
+    static int cols = 1;
 
     if (ImGui::Button("Subplot Layout"))
         ImGui::OpenPopup("Layout_popup");
