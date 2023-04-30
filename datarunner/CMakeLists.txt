@@ -19,3 +19,7 @@ target_link_libraries(DataRunner PRIVATE imgui::imgui)
 
 find_package(asio CONFIG REQUIRED)
 target_link_libraries(DataRunner PRIVATE asio asio::asio)
+
+add_custom_command(TARGET DataRunner PRE_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                       ${CMAKE_SOURCE_DIR}/datarunner/res/ $<TARGET_FILE_DIR:DataRunner>)

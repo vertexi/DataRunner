@@ -571,6 +571,36 @@ int main()
     ImGui::CreateContext();
     ImPlot::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
+
+    // // chinese font
+    // static const ImWchar chinese_ranges[] =
+    //     {
+    //         0x2000,
+    //         0x206F, // General Punctuation
+    //         0x3000,
+    //         0x30FF, // CJK Symbols and Punctuations, Hiragana, Katakana
+    //         0x31F0,
+    //         0x31FF, // Katakana Phonetic Extensions
+    //         0xFF00,
+    //         0xFFEF, // Half-width characters
+    //         0xFFFD,
+    //         0xFFFD, // Invalid
+    //         0x4e00,
+    //         0x9FAF, // CJK Ideograms
+    //         0,
+    //     };
+    // ImFontConfig config;
+    // config.MergeMode = true;
+    // config.OversampleH = 2;
+    // config.OversampleV = 2;
+    // config.GlyphExtraSpacing.x = 1.0f;
+    // io.Fonts->AddFontDefault();
+    // // io.Fonts->AddFontFromFileTTF("Zpix.ttf", 20.0f, &config, io.Fonts->GetGlyphRangesChineseFull());
+    // io.Fonts->AddFontFromFileTTF("yahei.ttf", 20.0f, &config, io.Fonts->GetGlyphRangesChineseFull());
+    // // io.Fonts->AddFontFromFileTTF("NotoSansSC-Regular.otf", 20.0f, &config, io.Fonts->GetGlyphRangesChineseFull());
+    // io.Fonts->Build();
+    // // chinese font
+
     (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
