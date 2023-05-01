@@ -1102,6 +1102,21 @@ void Demo_TimeScale()
     static char layout_selected[MAX_SUBPLOTS][MAX_SUBPLOTS] = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
     static char lay_selection_string[10];
     static std::vector<ImVec4> axis_swap; // for swap subplot axis
+
+    // cursor info
+    struct cursor_info
+    {
+        double pos;
+        ImVec4 color;
+
+        cursor_info(double Pos)
+        {
+            pos = Pos;
+            color = RandomColor();
+        }
+    };
+    static std::vector<cursor_info> x_cursor[MAX_SUBPLOTS][MAX_SUBPLOTS];
+    static std::vector<cursor_info> y_cursor[MAX_SUBPLOTS][MAX_SUBPLOTS];
     if (ImGui::BeginPopup("Layout_popup"))
     {
         for (int y = 0; y < MAX_SUBPLOTS; y++)
@@ -1140,6 +1155,7 @@ void Demo_TimeScale()
                 {
                     if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("subplot_DND"))
                     {
+                        // swap channel plot
                         ImVec2 colrow = *(ImVec2 *)payload->Data;
                         for (int i = 0; i < channel_num; i++)
                         {
@@ -1154,7 +1170,14 @@ void Demo_TimeScale()
                                 dnd[i].plot_row = (int)colrow.x;
                             }
                         }
-                        axis_swap.push_back(ImVec4(colrow.x, colrow.y, y, x));
+
+                        // swap subplot axis later
+                        axis_swap.push_back(ImVec4(colrow.x, colrow.y, (float)y, (float)x));
+
+                        // swap cursors
+                        std::vector<cursor_info> temp = x_cursor[(int)colrow.y][(int)colrow.x];
+                        x_cursor[(int)colrow.y][(int)colrow.x] = x_cursor[x][y];
+                        x_cursor[x][y] = temp;
                     }
                     ImGui::EndDragDropTarget();
                 }
@@ -1257,19 +1280,7 @@ void Demo_TimeScale()
 
             axis_swap.pop_back();
         }
-        struct cursor_info
-        {
-            double pos;
-            ImVec4 color;
 
-            cursor_info(double Pos)
-            {
-                pos = Pos;
-                color = RandomColor();
-            }
-        };
-        static std::vector<cursor_info> x_cursor[MAX_SUBPLOTS][MAX_SUBPLOTS];
-        static std::vector<cursor_info> y_cursor[MAX_SUBPLOTS][MAX_SUBPLOTS];
         for (int plot_row = 0; plot_row < rows; ++plot_row)
         {
             for (int plot_col = 0; plot_col < cols; ++plot_col)
@@ -1335,7 +1346,6 @@ void Demo_TimeScale()
                         }
                         ImPlot::TagY(y_cursor[plot_col][plot_row][idx].pos, y_cursor[plot_col][plot_row][idx].color, "%d:%s", idx, tag_string);
                     }
-
 
                     // allow each y-axis to be a DND target
                     for (int y = ImAxis_Y1; y <= ImAxis_Y3; ++y)
