@@ -1293,6 +1293,7 @@ void Demo_TimeScale()
                     ImPlot::SetupAxesLimits(0, 1, 0, 1);
                     ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"S");
                     ImPlot::SetupAxisFormat(ImAxis_Y1, MetricFormatter, (void *)"V");
+                    ImPlot::SetupAxis(ImAxis_X2, nullptr, ImPlotAxisFlags_Opposite);
                     ImPlot::SetupAxis(ImAxis_Y1, nullptr);
                     ImPlot::SetupAxis(ImAxis_Y2, nullptr);
                     ImPlot::SetupAxis(ImAxis_Y3, nullptr, ImPlotAxisFlags_Opposite);
@@ -1340,13 +1341,13 @@ void Demo_TimeScale()
                         }
                     }
                     // allow each x-axis to be a DND target
-                    for (int y = ImAxis_Y1; y <= ImAxis_Y3; ++y)
+                    for (int x = ImAxis_X1; x <= ImAxis_X2; ++x)
                     {
-                        if (ImPlot::BeginDragDropTargetAxis(y))
+                        if (ImPlot::BeginDragDropTargetAxis(x))
                         {
                             if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Vertical Cursor"))
                             {
-                                x_cursor[plot_col][plot_row].push_back(cursor_info(ImPlot::GetPlotMousePos().x, y));
+                                x_cursor[plot_col][plot_row].push_back(cursor_info(ImPlot::GetPlotMousePos().x, x));
                             }
                             ImPlot::EndDragDropTarget();
                         }
