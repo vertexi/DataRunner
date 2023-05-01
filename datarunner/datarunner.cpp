@@ -17,6 +17,8 @@
 #include "implot.h"
 #include "implot_internal.h"
 
+#include "IconsFontAwesome6.h"
+
 enum class DataType
 {
     DataType_int8_t,
@@ -517,6 +519,20 @@ void stop_socket()
     }
 }
 
+// Helper to display a little (?) mark which shows a tooltip when hovered.
+// In your own code you may want to display an actual icon if you are using a merged icon fonts (see docs/FONTS.md)
+static void HelpMarker(const char *desc)
+{
+    ImGui::TextDisabled("(" ICON_FA_QUESTION ")");
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && ImGui::BeginTooltip())
+    {
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        ImGui::TextUnformatted(desc);
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+}
+
 int main()
 {
     std::string code_str =
@@ -538,6 +554,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
     // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
     // create window using glfw library with 'LearnOpenGL' title
@@ -577,7 +594,7 @@ int main()
 // _WIN32 = we're in windows
 #ifdef _WIN32
     // Windows
-    int bytes = GetModuleFileName(NULL, prog_directory, len);
+    int bytes = GetModuleFileName(NULL, prog_directory, (DWORD)len);
     char *lastBackslash = strrchr(prog_directory, '\\');
     if (lastBackslash != NULL)
     {
@@ -590,23 +607,13 @@ int main()
         prog_directory[bytes] = '\0';
 #endif
 
+    char fontFilePath[512];
+
+    // io.Fonts->AddFontDefault();
+    snprintf(fontFilePath, sizeof(fontFilePath), "%sRoboto-Medium.ttf", prog_directory);
+    io.Fonts->AddFontFromFileTTF(fontFilePath, 20.0f);
+
     // chinese font
-    static const ImWchar chinese_ranges[] =
-        {
-            0x2000,
-            0x206F, // General Punctuation
-            0x3000,
-            0x30FF, // CJK Symbols and Punctuations, Hiragana, Katakana
-            0x31F0,
-            0x31FF, // Katakana Phonetic Extensions
-            0xFF00,
-            0xFFEF, // Half-width characters
-            0xFFFD,
-            0xFFFD, // Invalid
-            0x4e00,
-            0x9FAF, // CJK Ideograms
-            0,
-        };
     ImFontConfig config;
     config.MergeMode = true;
     config.OversampleH = 2;
@@ -616,16 +623,30 @@ int main()
     ImFontGlyphRangesBuilder builder;
     builder.AddText(u8"你好呀！");
     builder.BuildRanges(&ranges);
-    char fontFilePath[512];
     snprintf(fontFilePath, sizeof(fontFilePath), "%sNotoSansSC-Medium.otf", prog_directory);
-    io.Fonts->AddFontDefault();
     io.Fonts->AddFontFromFileTTF(fontFilePath, 20.0f, &config, ranges.Data);
-    io.Fonts->Build();
     // chinese font
+
+    float baseFontSize = 20.0f;                      // 13.0f is the size of the default font. Change to the font size you use.
+    float iconFontSize = baseFontSize * 2.0f / 3.0f; // FontAwesome fonts need to have their sizes reduced by 2.0f/3.0f in order to align correctly
+
+    // merge in icons from Font Awesome
+    static const ImWchar icons_ranges[] = {ICON_MIN_FA, ICON_MAX_16_FA, 0};
+    ImFontConfig icons_config;
+    icons_config.MergeMode = true;
+    icons_config.PixelSnapH = true;
+    icons_config.OversampleH = 2;
+    icons_config.GlyphMinAdvanceX = iconFontSize;
+    snprintf(fontFilePath, sizeof(fontFilePath), "%s" FONT_ICON_FILE_NAME_FAS, prog_directory);
+    io.Fonts->AddFontFromFileTTF(fontFilePath, iconFontSize, &icons_config, icons_ranges);
+    // use FONT_ICON_FILE_NAME_FAR if you want regular instead of solid
+    io.Fonts->Build();
 
     (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -646,6 +667,7 @@ int main()
     static bool show_implot_style_editor = false;
     static bool show_imgui_metrics = false;
     static bool show_imgui_style_editor = false;
+    static bool show_app_stack_tool = false;
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
@@ -672,6 +694,7 @@ int main()
                 ImGui::Separator();
                 ImGui::MenuItem("ImGui Metrics", nullptr, &show_imgui_metrics);
                 ImGui::MenuItem("ImGui Style Editor", nullptr, &show_imgui_style_editor);
+                ImGui::MenuItem("Stack Tool", NULL, &show_app_stack_tool);
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
@@ -699,6 +722,10 @@ int main()
         {
             ImGui::ShowMetricsWindow(&show_imgui_metrics);
         }
+        if (show_app_stack_tool)
+        {
+            ImGui::ShowStackToolWindow(&show_app_stack_tool);
+        }
 
         static float progress = 0.0f;
         ImGui::PushItemWidth(220);
@@ -725,7 +752,7 @@ int main()
         ImGui::InputTextWithHint("IP", "192.168.1.2", ip_addr, IM_ARRAYSIZE(ip_addr));
         ImGui::PopItemWidth();
         ImGui::SameLine();
-        ImGui::PushItemWidth(80);
+        ImGui::PushItemWidth(160);
         static int port = 5000;
         ImGui::InputInt("Port", &port);
         ImGui::PopItemWidth();
@@ -818,6 +845,17 @@ int main()
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        // Update and Render additional Platform Windows
+        // (Platform functions may change the current OpenGL context, so we save/restore it to make it easier to paste this code elsewhere.
+        //  For this specific demo app we could also call glfwMakeContextCurrent(window) directly)
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            GLFWwindow *backup_current_context = glfwGetCurrentContext();
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+            glfwMakeContextCurrent(backup_current_context);
+        }
 
         glfwSwapBuffers(window);
     }
@@ -1115,6 +1153,12 @@ void Demo_TimeScale()
                                 dnd[i].plot_row = (int)colrow.x;
                             }
                         }
+                        static char plot_name[10];
+                        snprintf(plot_name, sizeof(plot_name), "%d,%d", (int)colrow.x, (int)colrow.y);
+                        ImPlotPlot *plot1 = ImPlot::GetPlot(plot_name);
+                        snprintf(plot_name, sizeof(plot_name), "%d,%d", (int)y, (int)x);
+                        ImPlotPlot *plot2 = ImPlot::GetPlot(plot_name);
+                        plot2->Axes[ImAxis_X1].SetRange(plot1->Axes[ImAxis_X1].Range.Min, plot1->Axes[ImAxis_X1].Range.Max);
                     }
                     ImGui::EndDragDropTarget();
                 }
@@ -1123,8 +1167,56 @@ void Demo_TimeScale()
         ImGui::EndPopup();
     }
 
+    ImGui::SameLine();
+    ImGui::Button(ICON_FA_RULER_VERTICAL);
+    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+    {
+        ImGui::SetDragDropPayload("Vertical Cursor", nullptr, 0);
+        ImGui::TextUnformatted(ICON_FA_RULER_VERTICAL "Vertical Cursor");
+        ImGui::EndDragDropSource();
+    }
+    if (ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Vertical Cursor"))
+        {
+            ;
+        }
+        else if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Horizontal Cursor"))
+        {
+            ;
+        }
+        ImGui::EndDragDropTarget();
+    }
+    ImGui::SameLine();
+    ImGui::Button(ICON_FA_RULER_HORIZONTAL);
+    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+    {
+        ImGui::SetDragDropPayload("Horizontal Cursor", nullptr, 0);
+        ImGui::TextUnformatted(ICON_FA_RULER_HORIZONTAL "Horizontal Cursor");
+        ImGui::EndDragDropSource();
+    }
+    if (ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Vertical Cursor"))
+        {
+            ;
+        }
+        else if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Horizontal Cursor"))
+        {
+            ;
+        }
+        ImGui::EndDragDropTarget();
+    }
+    ImGui::SameLine();
+    HelpMarker("Drag and drop to add cursor.");
+
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar;
+    ImGui::Begin("Channel Pannel", nullptr, window_flags);
+    static bool markers_check = false;
+    ImGui::Checkbox("Markers", &markers_check);
+    ImGui::Separator();
     // control the channel drag and drop labels
-    ImGui::BeginChild("DND_LEFT", ImVec2(100, 400));
+    ImGui::BeginChild("DND_LEFT", ImVec2(200, 400));
     if (ImGui::Button("Reset Data"))
     {
         for (int k = 0; k < channel_num; ++k)
@@ -1137,7 +1229,7 @@ void Demo_TimeScale()
             continue;
         ImPlot::ItemIcon(dnd[k].Color);
         ImGui::SameLine();
-        ImGui::Selectable(dnd[k].Label, false, 0, ImVec2(100, 0));
+        ImGui::Selectable(dnd[k].Label, false, 0, ImVec2(200, 0));
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
         {
             ImGui::SetDragDropPayload("MY_DND", &k, sizeof(int));
@@ -1158,16 +1250,19 @@ void Demo_TimeScale()
         ImGui::EndDragDropTarget();
     }
 
+    ImGui::End();
+
     // start drop subplot
     static int plot_height = 800;
-    ImGui::SameLine();
+    static char plot_name[10];
     if (ImPlot::BeginSubplots("##ItemSharing", rows, cols, ImVec2(-20.0f, (float)plot_height)))
     {
         for (int plot_row = 0; plot_row < rows; ++plot_row)
         {
             for (int plot_col = 0; plot_col < cols; ++plot_col)
             {
-                if (ImPlot::BeginPlot("", ImVec2(-1, 400)))
+                snprintf(plot_name, sizeof(plot_name), "%d,%d", plot_col, plot_row);
+                if (ImPlot::BeginPlot(plot_name, ImVec2(-1, 400)))
                 {
                     ImPlot::SetupAxesLimits(0, 1, 0, 1);
                     ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"s");
@@ -1288,7 +1383,7 @@ void Demo_TimeScale()
                             }
                             ImPlot::SetAxis(dnd[channel.id].Yax);
                             WaveData data5(base, channel.id, stride, plot_t_min);
-                            if (dnd[channel.id].markers)
+                            if (dnd[channel.id].markers && markers_check)
                             {
                                 ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, dnd[channel.id].alpha);
                                 ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
@@ -1357,6 +1452,7 @@ void Demo_TimeScale()
     ImGui::PopID();
 }
 
+// TODO: self-test socket and plot(socket server and transfer data)
 // TODO: cursor delta-x
 // TODO: Config window and dataform
 // TODO: Find max, min, mean, frequency
