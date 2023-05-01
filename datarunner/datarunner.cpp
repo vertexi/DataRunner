@@ -461,7 +461,7 @@ int MetricFormatter(double value, char *buff, int size, void *data)
             }
             else
             {
-                int temp = snprintf(buff, size, "%lld%s%s", (int64_t)value / (int64_t)v[i], p[i], unit);
+                int temp = snprintf(buff, size, "%lld %s%s", (int64_t)value / (int64_t)v[i], p[i], unit);
                 double temp_value = (value - (int64_t)value);
                 if (temp_value != 0)
                 {
@@ -1171,18 +1171,6 @@ void Demo_TimeScale()
         ImGui::TextUnformatted(ICON_FA_RULER_VERTICAL "Vertical Cursor");
         ImGui::EndDragDropSource();
     }
-    if (ImGui::BeginDragDropTarget())
-    {
-        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Vertical Cursor"))
-        {
-            ;
-        }
-        else if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Horizontal Cursor"))
-        {
-            ;
-        }
-        ImGui::EndDragDropTarget();
-    }
     ImGui::SameLine();
     ImGui::Button(ICON_FA_RULER_HORIZONTAL);
     if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
@@ -1190,18 +1178,6 @@ void Demo_TimeScale()
         ImGui::SetDragDropPayload("Horizontal Cursor", nullptr, 0);
         ImGui::TextUnformatted(ICON_FA_RULER_HORIZONTAL "Horizontal Cursor");
         ImGui::EndDragDropSource();
-    }
-    if (ImGui::BeginDragDropTarget())
-    {
-        if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Vertical Cursor"))
-        {
-            ;
-        }
-        else if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Horizontal Cursor"))
-        {
-            ;
-        }
-        ImGui::EndDragDropTarget();
     }
     ImGui::SameLine();
     HelpMarker("Drag and drop to add cursor.");
@@ -1281,7 +1257,19 @@ void Demo_TimeScale()
 
             axis_swap.pop_back();
         }
+        struct cursor_info
+        {
+            double pos;
+            ImVec4 color;
 
+            cursor_info(double Pos)
+            {
+                pos = Pos;
+                color = RandomColor();
+            }
+        };
+        static std::vector<cursor_info> x_cursor[MAX_SUBPLOTS][MAX_SUBPLOTS];
+        static std::vector<cursor_info> y_cursor[MAX_SUBPLOTS][MAX_SUBPLOTS];
         for (int plot_row = 0; plot_row < rows; ++plot_row)
         {
             for (int plot_col = 0; plot_col < cols; ++plot_col)
@@ -1290,7 +1278,8 @@ void Demo_TimeScale()
                 if (ImPlot::BeginPlot(plot_name, ImVec2(-1, 400)))
                 {
                     ImPlot::SetupAxesLimits(0, 1, 0, 1);
-                    ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"s");
+                    ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"S");
+                    ImPlot::SetupAxisFormat(ImAxis_Y1, MetricFormatter, (void *)"V");
                     ImPlot::SetupAxis(ImAxis_Y1, nullptr);
                     ImPlot::SetupAxis(ImAxis_Y2, nullptr);
                     ImPlot::SetupAxis(ImAxis_Y3, nullptr, ImPlotAxisFlags_Opposite);
@@ -1306,8 +1295,47 @@ void Demo_TimeScale()
                             dnd[i].plot_row = plot_row;
                             dnd[i].Yax = ImAxis_Y1;
                         }
+                        else if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Horizontal Cursor"))
+                        {
+                            y_cursor[plot_col][plot_row].push_back(cursor_info(ImPlot::GetPlotMousePos().y));
+                        }
+                        else if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("Vertical Cursor"))
+                        {
+                            x_cursor[plot_col][plot_row].push_back(cursor_info(ImPlot::GetPlotMousePos().x));
+                        }
                         ImPlot::EndDragDropTarget();
                     }
+
+                    for (int idx = 0; idx < x_cursor[plot_col][plot_row].size(); idx++)
+                    {
+                        ImPlot::DragLineX(idx + 3000, &x_cursor[plot_col][plot_row][idx].pos, x_cursor[plot_col][plot_row][idx].color, 1, ImPlotDragToolFlags_None);
+                        char tag_string[100];
+                        MetricFormatter(x_cursor[plot_col][plot_row][idx].pos, tag_string, sizeof(tag_string), (void *)"S");
+                        if (ImPlot::BeginDragLineXPopup(idx + 3000, x_cursor[plot_col][plot_row][idx].pos))
+                        {
+                            ImGui::Text("%d", idx + 3000);
+                            ImGui::ColorEdit3("Color", &x_cursor[plot_col][plot_row][idx].color.x);
+                            ImPlot::EndDragLinePopup();
+                        }
+                        ImPlot::TagX(x_cursor[plot_col][plot_row][idx].pos, x_cursor[plot_col][plot_row][idx].color, "%d:%s", idx, tag_string);
+                        const ImVec2 size = ImGui::CalcTextSize("hello");
+                        const ImVec2 pos = ImPlot::GetLocationPos(GImPlot->CurrentPlot->PlotRect, size, ImPlotLocation_NorthEast, GImPlot->Style.MousePosPadding);
+                        GImGui->CurrentWindow->DrawList->AddText(pos, ImPlot::GetStyleColorU32(ImPlotCol_InlayText), "hello");
+                    }
+                    for (int idx = 0; idx < y_cursor[plot_col][plot_row].size(); idx++)
+                    {
+                        ImPlot::DragLineY(idx + 2000, &y_cursor[plot_col][plot_row][idx].pos, y_cursor[plot_col][plot_row][idx].color, 1, ImPlotDragToolFlags_None);
+                        char tag_string[100];
+                        MetricFormatter(y_cursor[plot_col][plot_row][idx].pos, tag_string, sizeof(tag_string), (void *)"V");
+                        if (ImPlot::BeginDragLineYPopup(idx + 2000, y_cursor[plot_col][plot_row][idx].pos))
+                        {
+                            ImGui::Text("%d", idx + 2000);
+                            ImGui::ColorEdit3("Color", &y_cursor[plot_col][plot_row][idx].color.x);
+                            ImPlot::EndDragLinePopup();
+                        }
+                        ImPlot::TagY(y_cursor[plot_col][plot_row][idx].pos, y_cursor[plot_col][plot_row][idx].color, "%d:%s", idx, tag_string);
+                    }
+
 
                     // allow each y-axis to be a DND target
                     for (int y = ImAxis_Y1; y <= ImAxis_Y3; ++y)
