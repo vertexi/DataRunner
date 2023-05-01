@@ -1101,6 +1101,7 @@ void Demo_TimeScale()
 
     static char layout_selected[MAX_SUBPLOTS][MAX_SUBPLOTS] = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
     static char lay_selection_string[10];
+    static std::vector<ImVec4> axis_swap; // for swap subplot axis
     if (ImGui::BeginPopup("Layout_popup"))
     {
         for (int y = 0; y < MAX_SUBPLOTS; y++)
@@ -1153,12 +1154,7 @@ void Demo_TimeScale()
                                 dnd[i].plot_row = (int)colrow.x;
                             }
                         }
-                        static char plot_name[10];
-                        snprintf(plot_name, sizeof(plot_name), "%d,%d", (int)colrow.x, (int)colrow.y);
-                        ImPlotPlot *plot1 = ImPlot::GetPlot(plot_name);
-                        snprintf(plot_name, sizeof(plot_name), "%d,%d", (int)y, (int)x);
-                        ImPlotPlot *plot2 = ImPlot::GetPlot(plot_name);
-                        plot2->Axes[ImAxis_X1].SetRange(plot1->Axes[ImAxis_X1].Range.Min, plot1->Axes[ImAxis_X1].Range.Max);
+                        axis_swap.push_back(ImVec4(colrow.x, colrow.y, y, x));
                     }
                     ImGui::EndDragDropTarget();
                 }
@@ -1254,14 +1250,43 @@ void Demo_TimeScale()
 
     // start drop subplot
     static int plot_height = 800;
-    static char plot_name[10];
-    if (ImPlot::BeginSubplots("##ItemSharing", rows, cols, ImVec2(-20.0f, (float)plot_height)))
+
+    if (ImPlot::BeginSubplots("Signal Plot", rows, cols, ImVec2(-20.0f, (float)plot_height)))
     {
+        // if subplot swap, swap the axis range
+        static char plot_name[10];
+        static ImGuiID plot_id;
+        static ImGuiID subplot_id;
+        if (axis_swap.size() > 0)
+        {
+            snprintf(plot_name, sizeof(plot_name), "##%d,%d", (int)axis_swap[0].y, (int)axis_swap[0].x);
+            subplot_id = (*GImGui).CurrentWindow->GetID((int)axis_swap[0].y + (int)axis_swap[0].x * cols);
+            plot_id = ImHashStr(plot_name, NULL, subplot_id);
+            ImPlotPlot &plot = *((*GImPlot).Plots.GetByKey(plot_id));
+
+            snprintf(plot_name, sizeof(plot_name), "##%d,%d", (int)axis_swap[0].w, (int)axis_swap[0].z);
+            subplot_id = (*GImGui).CurrentWindow->GetID((int)axis_swap[0].w + (int)axis_swap[0].z * cols);
+            plot_id = ImHashStr(plot_name, NULL, subplot_id);
+            ImPlotPlot &plot2 = *((*GImPlot).Plots.GetByKey(plot_id));
+
+            if (&plot != NULL && &plot2 != NULL)
+            {
+                for (int y = ImAxis_X1; y < ImAxis_COUNT; ++y)
+                {
+                    ImPlotRange range = plot.Axes[y].Range;
+                    plot.Axes[y].SetRange(plot2.Axes[y].Range);
+                    plot2.Axes[y].SetRange(range);
+                }
+            }
+
+            axis_swap.pop_back();
+        }
+
         for (int plot_row = 0; plot_row < rows; ++plot_row)
         {
             for (int plot_col = 0; plot_col < cols; ++plot_col)
             {
-                snprintf(plot_name, sizeof(plot_name), "%d,%d", plot_col, plot_row);
+                snprintf(plot_name, sizeof(plot_name), "##%d,%d", plot_col, plot_row);
                 if (ImPlot::BeginPlot(plot_name, ImVec2(-1, 400)))
                 {
                     ImPlot::SetupAxesLimits(0, 1, 0, 1);
