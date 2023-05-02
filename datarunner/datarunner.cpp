@@ -465,7 +465,7 @@ int MetricFormatter(double value, char *buff, int size, void *data)
                 double temp_value = (value - (int64_t)value);
                 if (temp_value != 0)
                 {
-                    return MetricFormatter(temp_value, buff + temp, size - temp, data);
+                    return MetricFormatter(temp_value, buff + temp, size - temp, data) + temp;
                 }
                 return temp;
             }
@@ -1109,12 +1109,14 @@ void Demo_TimeScale()
         double pos;
         ImVec4 color;
         ImAxis axis;
+        bool enable;
 
         cursor_info(double Pos, ImAxis Axis)
         {
             pos = Pos;
             color = RandomColor();
             axis = Axis;
+            enable = true;
         }
     };
     static std::vector<cursor_info> x_cursor[MAX_SUBPLOTS][MAX_SUBPLOTS];
@@ -1371,10 +1373,18 @@ void Demo_TimeScale()
                     {
                         ImPlot::SetAxis(x_cursor[plot_col][plot_row][idx].axis);
                         ImPlot::DragLineX(idx + 3000, &x_cursor[plot_col][plot_row][idx].pos, x_cursor[plot_col][plot_row][idx].color, 1, ImPlotDragToolFlags_None);
+                        if (ImPlot::BeginDragLineXTooltip(idx + 3000, x_cursor[plot_col][plot_row][idx].pos))
+                        {
+                            ImGui::Text("X%d",  idx);
+                            ImPlot::EndDragLineTooltip();
+                        }
                         char tag_string[100];
                         MetricFormatter(x_cursor[plot_col][plot_row][idx].pos, tag_string, sizeof(tag_string), (void *)"S");
                         if (ImPlot::BeginDragLineXPopup(idx + 3000, x_cursor[plot_col][plot_row][idx].pos))
                         {
+                            ImGui::Text("X%d", idx);
+                            ImGui::Separator();
+                            ImGui::Checkbox("Enable", &x_cursor[plot_col][plot_row][idx].enable);
                             ImGui::ColorEdit3("Color", &x_cursor[plot_col][plot_row][idx].color.x);
                             ImPlot::EndDragLinePopup();
                         }
@@ -1384,36 +1394,68 @@ void Demo_TimeScale()
                     {
                         ImPlot::SetAxis(y_cursor[plot_col][plot_row][idx].axis);
                         ImPlot::DragLineY(idx + 2000, &y_cursor[plot_col][plot_row][idx].pos, y_cursor[plot_col][plot_row][idx].color, 1, ImPlotDragToolFlags_None);
+                        if (ImPlot::BeginDragLineYTooltip(idx + 2000, y_cursor[plot_col][plot_row][idx].pos))
+                        {
+                            ImGui::Text("Y%d",  idx);
+                            ImPlot::EndDragLineTooltip();
+                        }
                         char tag_string[100];
                         MetricFormatter(y_cursor[plot_col][plot_row][idx].pos, tag_string, sizeof(tag_string), (void *)"V");
                         if (ImPlot::BeginDragLineYPopup(idx + 2000, y_cursor[plot_col][plot_row][idx].pos))
                         {
+                            ImGui::Text("Y%d", idx);
+                            ImGui::Separator();
+                            ImGui::Checkbox("Enable", &y_cursor[plot_col][plot_row][idx].enable);
                             ImGui::ColorEdit3("Color", &y_cursor[plot_col][plot_row][idx].color.x);
                             ImPlot::EndDragLinePopup();
                         }
                         ImPlot::TagY(y_cursor[plot_col][plot_row][idx].pos, y_cursor[plot_col][plot_row][idx].color, "%d:%s", idx, tag_string);
                     }
+                    // clear disabled cursor
+                    for (int idx = 0; idx < x_cursor[plot_col][plot_row].size(); idx++)
+                    {
+                        if (!x_cursor[plot_col][plot_row][idx].enable)
+                        {
+                            x_cursor[plot_col][plot_row].erase(x_cursor[plot_col][plot_row].begin() + idx);
+                        }
+                    }
+                    for (int idx = 0; idx < y_cursor[plot_col][plot_row].size(); idx++)
+                    {
+                        if (!y_cursor[plot_col][plot_row][idx].enable)
+                        {
+                            y_cursor[plot_col][plot_row].erase(y_cursor[plot_col][plot_row].begin() + idx);
+                        }
+                    }
+                    // show the cursor diff annotation
                     do
                     {
-                        ImVector<double> x_diff;
-                        ImVector<double> y_diff;
+                        static char diff_annotation[1000];
+                        int char_pos = 0;
                         if (x_cursor[plot_col][plot_row].size() > 1)
                         {
                             for (int idx = 1; idx < x_cursor[plot_col][plot_row].size(); idx++)
                             {
-                                x_diff.push_back(x_cursor[plot_col][plot_row][idx].pos - x_cursor[plot_col][plot_row][idx - 1].pos);
+                                double x_diff = x_cursor[plot_col][plot_row][idx].pos - x_cursor[plot_col][plot_row][idx - 1].pos;
+                                char_pos += snprintf(diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, "X%d - X%d = ", idx, idx - 1);
+                                char_pos += MetricFormatter(x_diff, diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, (void *)"S");
+                                diff_annotation[char_pos++] = '\n';
                             }
                         }
+                        diff_annotation[char_pos++] = '\n';
                         if (y_cursor[plot_col][plot_row].size() > 1)
                         {
                             for (int idx = 1; idx < y_cursor[plot_col][plot_row].size(); idx++)
                             {
-                                y_diff.push_back(y_cursor[plot_col][plot_row][idx].pos - y_cursor[plot_col][plot_row][idx - 1].pos);
+                                double y_diff = y_cursor[plot_col][plot_row][idx].pos - y_cursor[plot_col][plot_row][idx - 1].pos;
+                                char_pos += snprintf(diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, "Y%d - Y%d = ", idx, idx - 1);
+                                char_pos += MetricFormatter(y_diff, diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, (void *)"V");
+                                diff_annotation[char_pos++] = '\n';
                             }
                         }
-                        const ImVec2 size = ImGui::CalcTextSize("hello");
+                        diff_annotation[char_pos++] = '\0';
+                        const ImVec2 size = ImGui::CalcTextSize(diff_annotation);
                         const ImVec2 pos = ImPlot::GetLocationPos(GImPlot->CurrentPlot->PlotRect, size, ImPlotLocation_NorthEast, GImPlot->Style.MousePosPadding);
-                        GImGui->CurrentWindow->DrawList->AddText(pos, ImPlot::GetStyleColorU32(ImPlotCol_InlayText), "hello");
+                        GImGui->CurrentWindow->DrawList->AddText(pos, ImPlot::GetStyleColorU32(ImPlotCol_InlayText), diff_annotation);
                     } while (0);
 
                     // calculate the axis and real data index mapping
