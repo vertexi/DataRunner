@@ -449,7 +449,7 @@ int MetricFormatter(double value, char *buff, int size, void *data)
     static const char *p[] = {"G", "M", "k", "", "m", "u", "n"};
     if (value == 0)
     {
-        return snprintf(buff, size, "0 %s", unit);
+        return snprintf(buff, size, "0%s", unit);
     }
     for (int i = 0; i < 7; ++i)
     {
@@ -457,11 +457,11 @@ int MetricFormatter(double value, char *buff, int size, void *data)
         {
             if (i > 3)
             {
-                return snprintf(buff, size, "%g %s%s", value / v[i], p[i], unit);
+                return snprintf(buff, size, "%g%s%s", value / v[i], p[i], unit);
             }
             else
             {
-                int temp = snprintf(buff, size, "%lld %s%s", (int64_t)value / (int64_t)v[i], p[i], unit);
+                int temp = snprintf(buff, size, "%lld%s%s", (int64_t)value / (int64_t)v[i], p[i], unit);
                 double temp_value = (value - (int64_t)value);
                 if (temp_value != 0)
                 {
@@ -471,7 +471,7 @@ int MetricFormatter(double value, char *buff, int size, void *data)
             }
         }
     }
-    return snprintf(buff, size, "%g %s%s", value / v[6], p[6], unit);
+    return snprintf(buff, size, "%g%s%s", value / v[6], p[6], unit);
 }
 
 int MetricFormatter_orig(double value, char *buff, int size, void *data)
@@ -823,7 +823,7 @@ int main()
 
         ImGui::SameLine();
         static char frequency_string[100];
-        MetricFormatter_orig(data_freq, frequency_string, 100, (void *)"Hz");
+        MetricFormatter_orig(data_freq, frequency_string, 100, (void *)"hz");
         ImGui::PushItemWidth(120);
         ImGui::DragFloat("data frequency", &data_freq, 1000.0f, 0.0f, 100000.0f, frequency_string);
         ImGui::PopItemWidth();
@@ -1293,8 +1293,8 @@ void Demo_TimeScale()
                 if (ImPlot::BeginPlot(plot_name, ImVec2(-1, 400)))
                 {
                     ImPlot::SetupAxesLimits(0, 1, 0, 1);
-                    ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"S");
-                    ImPlot::SetupAxisFormat(ImAxis_Y1, MetricFormatter, (void *)"V");
+                    ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"s");
+                    ImPlot::SetupAxisFormat(ImAxis_Y1, MetricFormatter, (void *)"v");
                     ImPlot::SetupAxis(ImAxis_X2, nullptr, ImPlotAxisFlags_Opposite);
                     ImPlot::SetupAxis(ImAxis_Y1, nullptr);
                     ImPlot::SetupAxis(ImAxis_Y2, nullptr);
@@ -1379,7 +1379,7 @@ void Demo_TimeScale()
                             ImPlot::EndDragLineTooltip();
                         }
                         char tag_string[100];
-                        MetricFormatter(x_cursor[plot_col][plot_row][idx].pos, tag_string, sizeof(tag_string), (void *)"S");
+                        MetricFormatter(x_cursor[plot_col][plot_row][idx].pos, tag_string, sizeof(tag_string), (void *)"s");
                         if (ImPlot::BeginDragLineXPopup(idx + 3000, x_cursor[plot_col][plot_row][idx].pos))
                         {
                             ImGui::Text("X%d", idx);
@@ -1400,7 +1400,7 @@ void Demo_TimeScale()
                             ImPlot::EndDragLineTooltip();
                         }
                         char tag_string[100];
-                        MetricFormatter(y_cursor[plot_col][plot_row][idx].pos, tag_string, sizeof(tag_string), (void *)"V");
+                        MetricFormatter(y_cursor[plot_col][plot_row][idx].pos, tag_string, sizeof(tag_string), (void *)"v");
                         if (ImPlot::BeginDragLineYPopup(idx + 2000, y_cursor[plot_col][plot_row][idx].pos))
                         {
                             ImGui::Text("Y%d", idx);
@@ -1437,7 +1437,9 @@ void Demo_TimeScale()
                             {
                                 double x_diff = x_cursor[plot_col][plot_row][idx].pos - x_cursor[plot_col][plot_row][idx - 1].pos;
                                 char_pos += snprintf(diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, "X%d - X%d = ", idx, idx - 1);
-                                char_pos += MetricFormatter(x_diff, diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, (void *)"S");
+                                char_pos += MetricFormatter(x_diff, diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, (void *)"s");
+                                char_pos += snprintf(diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, "\t\tf: ");
+                                char_pos += MetricFormatter(fabs(1/x_diff), diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, (void *)"hz");
                                 diff_annotation[char_pos++] = '\n';
                             }
                         }
@@ -1448,7 +1450,7 @@ void Demo_TimeScale()
                             {
                                 double y_diff = y_cursor[plot_col][plot_row][idx].pos - y_cursor[plot_col][plot_row][idx - 1].pos;
                                 char_pos += snprintf(diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, "Y%d - Y%d = ", idx, idx - 1);
-                                char_pos += MetricFormatter(y_diff, diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, (void *)"V");
+                                char_pos += MetricFormatter(y_diff, diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, (void *)"v");
                                 diff_annotation[char_pos++] = '\n';
                             }
                         }
