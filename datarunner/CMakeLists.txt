@@ -1,5 +1,7 @@
 add_executable(DataRunner datarunner.cpp)
 
+set_target_properties(DataRunner PROPERTIES COMPILE_FLAGS "/bigobj")
+
 add_subdirectory(implot)
 target_link_libraries(DataRunner PUBLIC implot)
 

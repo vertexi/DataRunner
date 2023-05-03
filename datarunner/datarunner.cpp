@@ -282,6 +282,7 @@ size_t packet_round = 0;
 size_t packet_buf_buf = 0; // buffer for when reading from plot not changed by socket
 size_t data_buf_idx = 0;
 float data_freq = 10000.0f;
+int plot_downsample = 2000;
 size_t data_idx_min()
 {
     if (packet_round > 0)
@@ -829,6 +830,10 @@ int main()
         ImGui::PushItemWidth(120);
         ImGui::DragFloat("data frequency", &data_freq, 1000.0f, 0.0f, 100000.0f, frequency_string);
         ImGui::PopItemWidth();
+        ImGui::SameLine();
+        ImGui::PushItemWidth(120);
+        ImGui::DragInt("plot downsample", &plot_downsample, 1000, 1000, 100000);
+        ImGui::PopItemWidth();
 
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
@@ -939,15 +944,50 @@ static void ShowLogWindow(bool *p_open)
     ImGui::End();
 }
 
+struct DataExpression
+{
+    DataExpression()
+    {
+        table.add_variable("x", x);
+        table.add_constants();
+        expr.register_symbol_table(table);
+    }
+
+    bool set(char *_str, size_t size)
+    {
+        if (size > 500)
+        {
+            return valid = false;
+        }
+        mem_cpy(str, _str, size);
+        return valid = parser.compile(_str, expr);
+    }
+
+    double eval(double _x)
+    {
+        x = _x;
+        return expr.value();
+    }
+
+    bool valid;
+    char str[500];
+    exprtk::symbol_table<double> table;
+    exprtk::expression<double> expr;
+    exprtk::parser<double> parser;
+    double x;
+};
+
 struct WaveData
 {
     size_t base, id, stride, plot_min;
-    WaveData(size_t Base, size_t Id, size_t Stride, size_t Plot_min)
+    DataExpression *expr;
+    WaveData(size_t Base, size_t Id, size_t Stride, size_t Plot_min, DataExpression *Expr)
     {
         base = Base;
         id = Id;
         stride = Stride;
         plot_min = Plot_min;
+        expr = Expr;
     }
 };
 
@@ -966,42 +1006,48 @@ ImPlotPoint DataWave(int idx, void *data)
     char *data_pos = packet_pos + channels[wd->id].byte_offset;
 
     double time = (wd->plot_min + idx * wd->stride) / data_freq;
+    double ydata = 0.0f;
     switch (channels[wd->id].data_type)
     {
     case DataType::DataType_int8_t:
-        return ImPlotPoint(time, *((int8_t *)data_pos));
+        ydata = *((int8_t *)data_pos);
         break;
     case DataType::DataType_int16_t:
-        return ImPlotPoint(time, *((int16_t *)data_pos));
+        ydata = *((int16_t *)data_pos);
         break;
     case DataType::DataType_int32_t:
-        return ImPlotPoint(time, *((int32_t *)data_pos));
+       ydata = *((int32_t *)data_pos);
         break;
     case DataType::DataType_int64_t:
-        return ImPlotPoint(time, (double)(*((int64_t *)data_pos)));
+        ydata = (double)(*((int64_t *)data_pos));
         break;
     case DataType::DataType_uint8_t:
-        return ImPlotPoint(time, *((uint8_t *)data_pos));
+        ydata = *((uint8_t *)data_pos);
         break;
     case DataType::DataType_uint16_t:
-        return ImPlotPoint(time, *((uint16_t *)data_pos));
+        ydata = *((uint16_t *)data_pos);
         break;
     case DataType::DataType_uint32_t:
-        return ImPlotPoint(time, *((uint32_t *)data_pos));
+        ydata = *((uint32_t *)data_pos);
         break;
     case DataType::DataType_uint64_t:
-        return ImPlotPoint(time, (double)(*((uint64_t *)data_pos)));
+        ydata = (double)(*((uint64_t *)data_pos));
         break;
     case DataType::DataType_float:
-        return ImPlotPoint(time, *((float *)data_pos));
+        ydata = *((float *)data_pos);
         break;
     case DataType::DataType_double:
-        return ImPlotPoint(time, *((double *)data_pos));
+        ydata = *((double *)data_pos);
         break;
     default:
         return ImPlotPoint(time, NAN);
         break;
     }
+    if (wd->expr->valid)
+    {
+        return ImPlotPoint(time, wd->expr->eval(ydata));
+    }
+    return ImPlotPoint(time, ydata);
 }
 
 template <typename T>
@@ -1063,7 +1109,7 @@ void Demo_TimeScale()
             Color = color;
             alpha = 1.0f;
             thickness = 1.0f;
-            markers = true;
+            markers = false;
             shaded = false;
             color_enable = true;
             snprintf(Label, sizeof(Label), "%s", name);
@@ -1076,6 +1122,7 @@ void Demo_TimeScale()
     };
 
     static std::vector<MyDndItem> dnd;
+    static DataExpression exprs[200];
 
     // initialize each channel plot configuration
     if (one_time_run)
@@ -1091,6 +1138,7 @@ void Demo_TimeScale()
             {
                 dnd.push_back(MyDndItem(channels[i].name, RandomColor()));
             }
+            exprs[i].set("x", 2);
         }
     }
 
@@ -1212,12 +1260,12 @@ void Demo_TimeScale()
     HelpMarker("Drag and drop to add cursor.");
 
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_AlwaysHorizontalScrollbar;
-    ImGui::Begin("Channel Pannel", nullptr, window_flags);
-    static bool markers_check = false;
+    ImGui::Begin("Channel Pannel", nullptr, ImGuiWindowFlags_None);
+    static bool markers_check = true;
     ImGui::Checkbox("Markers", &markers_check);
     ImGui::Separator();
     // control the channel drag and drop labels
-    ImGui::BeginChild("DND_LEFT", ImVec2(200, 400));
+    ImGui::BeginChild("DND_LEFT", ImVec2(-1, 400));
     if (ImGui::Button("Reset Data"))
     {
         for (int k = 0; k < channel_num; ++k)
@@ -1239,6 +1287,15 @@ void Demo_TimeScale()
             ImGui::TextUnformatted(dnd[k].Label);
             ImGui::EndDragDropSource();
         }
+        ImGui::PushID(k);
+        bool valid = exprs[k].valid;
+        if (!valid)
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, {1, 0, 0, 1});
+        if (ImGui::InputText("f(x)", exprs[k].str, sizeof(exprs[k].str), ImGuiInputTextFlags_EnterReturnsTrue))
+            exprs[k].set(exprs[k].str, sizeof(exprs[k].str));
+        if (!valid)
+            ImGui::PopStyleColor();
+        ImGui::PopID();
     }
     ImGui::EndChild();
     if (ImGui::BeginDragDropTarget())
@@ -1377,7 +1434,7 @@ void Demo_TimeScale()
                         ImPlot::DragLineX(idx + 3000, &x_cursor[plot_col][plot_row][idx].pos, x_cursor[plot_col][plot_row][idx].color, 1, ImPlotDragToolFlags_None);
                         if (ImPlot::BeginDragLineXTooltip(idx + 3000, x_cursor[plot_col][plot_row][idx].pos))
                         {
-                            ImGui::Text("X%d",  idx);
+                            ImGui::Text("X%d", idx);
                             ImPlot::EndDragLineTooltip();
                         }
                         char tag_string[100];
@@ -1398,7 +1455,7 @@ void Demo_TimeScale()
                         ImPlot::DragLineY(idx + 2000, &y_cursor[plot_col][plot_row][idx].pos, y_cursor[plot_col][plot_row][idx].color, 1, ImPlotDragToolFlags_None);
                         if (ImPlot::BeginDragLineYTooltip(idx + 2000, y_cursor[plot_col][plot_row][idx].pos))
                         {
-                            ImGui::Text("Y%d",  idx);
+                            ImGui::Text("Y%d", idx);
                             ImPlot::EndDragLineTooltip();
                         }
                         char tag_string[100];
@@ -1441,7 +1498,7 @@ void Demo_TimeScale()
                                 char_pos += snprintf(diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, "X%d - X%d = ", idx, idx - 1);
                                 char_pos += MetricFormatter(x_diff, diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, (void *)"s");
                                 char_pos += snprintf(diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, "\t\tf: ");
-                                char_pos += MetricFormatter(fabs(1/x_diff), diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, (void *)"hz");
+                                char_pos += MetricFormatter(fabs(1 / x_diff), diff_annotation + char_pos, sizeof(diff_annotation) - char_pos, (void *)"hz");
                                 diff_annotation[char_pos++] = '\n';
                             }
                         }
@@ -1504,13 +1561,13 @@ void Demo_TimeScale()
 
                     size_t size = plot_t_max - plot_t_min;
                     size_t stride = 0;
-                    if (size < 1000)
+                    if (size < plot_downsample)
                     {
                         stride = 1;
                     }
                     else
                     {
-                        stride = size / 1000;
+                        stride = size / plot_downsample;
                     }
 
                     size_t count = size / stride;
@@ -1530,7 +1587,7 @@ void Demo_TimeScale()
                                 ImPlot::EndDragDropSource();
                             }
                             ImPlot::SetAxis(dnd[channel.id].Yax);
-                            WaveData data5(base, channel.id, stride, plot_t_min);
+                            WaveData data5(base, channel.id, stride, plot_t_min, &exprs[channel.id]);
                             if (dnd[channel.id].markers && markers_check)
                             {
                                 ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, dnd[channel.id].alpha);
