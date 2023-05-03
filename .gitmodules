@@ -3,4 +3,4 @@
 	url = https://github.com/vertexi/implot
 [submodule "datarunner/exprtk"]
 	path = datarunner/exprtk
-	url = https://github.com/ArashPartow/exprtk
+	url = https://github.com/vertexi/exprtk
