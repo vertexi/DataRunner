@@ -19,6 +19,8 @@
 
 #include "IconsFontAwesome6.h"
 
+#include "exprtk.hpp"
+
 enum class DataType
 {
     DataType_int8_t,

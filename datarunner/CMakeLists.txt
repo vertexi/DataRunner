@@ -3,6 +3,9 @@ add_executable(DataRunner datarunner.cpp)
 add_subdirectory(implot)
 target_link_libraries(DataRunner PUBLIC implot)
 
+add_subdirectory(exprtk)
+target_link_libraries(DataRunner PUBLIC exprtk)
+
 find_package(glad CONFIG REQUIRED)
 target_link_libraries(DataRunner PRIVATE glad::glad)
 
