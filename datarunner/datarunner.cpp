@@ -273,7 +273,7 @@ using asio::ip::tcp;
 bool stop_transfer = true;
 #define DATA_BUF_SIZE (1024 * 1024 * 1024)
 #define PAKCET_BUF_DIVSION (100) // 100 for 1%, 10 for 10%
-#define RECV_BUF_SIZE (10 * 1024)
+#define RECV_BUF_SIZE (100 * 1024)
 char data_buf[DATA_BUF_SIZE];
 size_t packet_size = 0;
 size_t packet_max = 0;
@@ -387,7 +387,6 @@ void extractData(char *data, size_t data_len)
     if (overflow)
     {
         size_t end_pos = packet_size - receive_buffer_temp_len + 1;
-        print_memory_hex(data, packet_size);
         if (*(data + end_pos) == '\n')
         {
 
@@ -402,11 +401,12 @@ void extractData(char *data, size_t data_len)
                 data_buf_idx = 0;
                 packet_round += 1;
             }
-            printf("good\n");
         }
         else
         {
-            printf("false\n");
+            print_memory_hex(receive_buffer_temp, receive_buffer_temp_len);
+            print_memory_hex(data, 2*packet_size);
+            printf("bad packet\n");
         }
         overflow = false;
         receive_buffer_temp_len = 0;
@@ -438,7 +438,6 @@ void extractData(char *data, size_t data_len)
                 receive_buffer_temp_len = data_len - idx;
                 _memccpy(receive_buffer_temp, cur_pos, sizeof(char), receive_buffer_temp_len);
                 overflow = true;
-                print_memory_hex(receive_buffer_temp, receive_buffer_temp_len);
                 return;
             }
         }
