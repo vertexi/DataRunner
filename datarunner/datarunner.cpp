@@ -537,9 +537,12 @@ static void HelpMarker(const char *desc)
 
 int main()
 {
+    // std::string code_str =
+    //     "float vol; // vol\n"
+    //     "uint8_t send_buf[7]; \n";
+
     std::string code_str =
-        "float vol; // vol\n"
-        "uint8_t send_buf[7]; \n";
+        "float ad[10]; // AD\n";
 
     channels = create_data_channel_array(code_str, &packet_size);
     packet_max = DATA_BUF_SIZE / packet_size;
@@ -1004,7 +1007,7 @@ ImPlotPoint DataWave(int idx, void *data)
     }
     char *data_pos = packet_pos + channels[wd->id].byte_offset;
 
-    double time = (wd->plot_min + idx * wd->stride) / data_freq;
+    double time = (double)(wd->plot_min + idx * wd->stride) / (double)data_freq;
     double ydata = 0.0f;
     switch (channels[wd->id].data_type)
     {
@@ -1351,8 +1354,8 @@ void Demo_TimeScale()
                 if (ImPlot::BeginPlot(plot_name, ImVec2(-1, 400)))
                 {
                     ImPlot::SetupAxesLimits(0, 1, 0, 1);
-                    ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"s");
-                    ImPlot::SetupAxisFormat(ImAxis_Y1, MetricFormatter, (void *)"v");
+                    // ImPlot::SetupAxisFormat(ImAxis_X1, MetricFormatter, (void *)"s");
+                    // ImPlot::SetupAxisFormat(ImAxis_Y1, MetricFormatter, (void *)"v");
                     ImPlot::SetupAxis(ImAxis_X2, nullptr, ImPlotAxisFlags_Opposite);
                     ImPlot::SetupAxis(ImAxis_Y1, nullptr);
                     ImPlot::SetupAxis(ImAxis_Y2, nullptr);

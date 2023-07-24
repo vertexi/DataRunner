@@ -11,6 +11,9 @@ input_code = """
 float vol; // vol
 uint8_t send_buf[7]; // data_buffer
 """
+input_code = """
+float ad[10]; // AD
+"""
 
 # parse input code and extract variable information
 variables = []
