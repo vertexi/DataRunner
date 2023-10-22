@@ -344,8 +344,15 @@ void dataquery()
     size_t total = 0;
     static bool one_more_time = false;
     //
-    while ((read_len = data_socket.read_some(asio::buffer(receive_buffer), error)) >= 0)
+    while ((read_len = asio::read(data_socket, asio::buffer(receive_buffer), asio::transfer_exactly((1460/22*22)), error)) >= 0)
     {
+        asio::error_code conn_error;
+        asio::write(data_socket, asio::buffer(msg), conn_error);
+        if (conn_error)
+        {
+            std::cout << "send failed: " << error.message() << std::endl;
+        }
+
         if (error && error != asio::error::eof)
         {
             std::cout << "receive failed: " << error.message() << std::endl;
@@ -384,6 +391,7 @@ void extractData(char *data, size_t data_len)
     static size_t receive_buffer_temp_len = 0;
     static bool overflow = false;
 
+    // print_memory_hex(data, data_len);
     if (overflow)
     {
         size_t end_pos = packet_size - receive_buffer_temp_len + 1;
@@ -541,8 +549,11 @@ int main()
     //     "float vol; // vol\n"
     //     "uint8_t send_buf[7]; \n";
 
+    // std::string code_str =
+    //     "float ad[10]; // AD\n";
+
     std::string code_str =
-        "float ad[10]; // AD\n";
+        "uint16_t ad[10]; // AD\n";
 
     channels = create_data_channel_array(code_str, &packet_size);
     packet_max = DATA_BUF_SIZE / packet_size;
@@ -626,10 +637,9 @@ int main()
     config.GlyphExtraSpacing.x = 1.0f;
     ImVector<ImWchar> ranges;
     ImFontGlyphRangesBuilder builder;
-    builder.AddText(u8"你好呀！");
-    builder.BuildRanges(&ranges);
-    snprintf(fontFilePath, sizeof(fontFilePath), "%sNotoSansSC-Medium.otf", prog_directory);
-    io.Fonts->AddFontFromFileTTF(fontFilePath, 20.0f, &config, ranges.Data);
+    // builder.BuildRanges(&ranges);
+    // snprintf(fontFilePath, sizeof(fontFilePath), "%sNotoSansSC-Medium.otf", prog_directory);
+    // io.Fonts->AddFontFromFileTTF(fontFilePath, 20.0f, &config, ranges.Data);
     // chinese font
 
     float baseFontSize = 20.0f;                      // 13.0f is the size of the default font. Change to the font size you use.
@@ -776,6 +786,9 @@ int main()
                     {
                         // connection
                         data_socket.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(ip_addr), port));
+                        data_socket.set_option(asio::ip::tcp::no_delay(true));
+	                    data_socket.set_option(asio::socket_base::receive_buffer_size(1920 * 1080 * 4));
+	                    data_socket.set_option(asio::socket_base::send_buffer_size(1920 * 1080 * 4));
                     }
                     catch (std::exception &e)
                     {
