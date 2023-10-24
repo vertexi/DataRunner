@@ -25,6 +25,10 @@ target_link_libraries(DataRunner PRIVATE imgui::imgui)
 find_package(asio CONFIG REQUIRED)
 target_link_libraries(DataRunner PRIVATE asio asio::asio)
 
+find_package(libusb CONFIG REQUIRED)
+target_include_directories(DataRunner PRIVATE ${LIBUSB_INCLUDE_DIRS})
+target_link_libraries(DataRunner PRIVATE ${LIBUSB_LIBRARIES})
+
 add_custom_command(TARGET DataRunner PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                        ${CMAKE_SOURCE_DIR}/datarunner/res/ $<TARGET_FILE_DIR:DataRunner>)

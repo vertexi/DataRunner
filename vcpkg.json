@@ -12,6 +12,7 @@
     },
     "glfw3",
     "glad",
-    "asio"
+    "asio",
+    "libusb"
   ]
 }

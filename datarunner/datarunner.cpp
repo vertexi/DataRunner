@@ -21,6 +21,39 @@
 
 #include "exprtk.hpp"
 
+#include "asio.hpp"
+using asio::ip::tcp;
+
+#include "libusb.h"
+
+static void print_devs(libusb_device **devs)
+{
+	libusb_device *dev;
+	int i = 0, j = 0;
+	uint8_t path[8];
+
+	while ((dev = devs[i++]) != NULL) {
+		struct libusb_device_descriptor desc;
+		int r = libusb_get_device_descriptor(dev, &desc);
+		if (r < 0) {
+			fprintf(stderr, "failed to get device descriptor");
+			return;
+		}
+
+		printf("%04x:%04x (bus %d, device %d)",
+			desc.idVendor, desc.idProduct,
+			libusb_get_bus_number(dev), libusb_get_device_address(dev));
+
+		r = libusb_get_port_numbers(dev, path, sizeof(path));
+		if (r > 0) {
+			printf(" path: %d", path[0]);
+			for (j = 1; j < r; j++)
+				printf(".%d", path[j]);
+		}
+		printf("\n");
+	}
+}
+
 enum class DataType
 {
     DataType_int8_t,
@@ -267,8 +300,6 @@ std::vector<data_channel> create_data_channel_array(const std::string &code_str,
     return channels;
 }
 
-#include "asio.hpp"
-using asio::ip::tcp;
 
 bool stop_transfer = true;
 #define DATA_BUF_SIZE (1024 * 1024 * 1024)
@@ -344,15 +375,8 @@ void dataquery()
     size_t total = 0;
     static bool one_more_time = false;
     //
-    while ((read_len = asio::read(data_socket, asio::buffer(receive_buffer), asio::transfer_exactly((1460/22*22)), error)) >= 0)
+    while ((read_len = asio::read(data_socket, asio::buffer(receive_buffer), asio::transfer_exactly(1460/22*22+2), error)) >= 0)
     {
-        asio::error_code conn_error;
-        asio::write(data_socket, asio::buffer(msg), conn_error);
-        if (conn_error)
-        {
-            std::cout << "send failed: " << error.message() << std::endl;
-        }
-
         if (error && error != asio::error::eof)
         {
             std::cout << "receive failed: " << error.message() << std::endl;
@@ -390,8 +414,8 @@ void extractData(char *data, size_t data_len)
     static char receive_buffer_temp[RECV_BUF_SIZE] = {0};
     static size_t receive_buffer_temp_len = 0;
     static bool overflow = false;
+    size_t init_idx = 0;
 
-    // print_memory_hex(data, data_len);
     if (overflow)
     {
         size_t end_pos = packet_size - receive_buffer_temp_len + 1;
@@ -409,6 +433,7 @@ void extractData(char *data, size_t data_len)
                 data_buf_idx = 0;
                 packet_round += 1;
             }
+            init_idx = end_pos;
         }
         else
         {
@@ -419,7 +444,7 @@ void extractData(char *data, size_t data_len)
         overflow = false;
         receive_buffer_temp_len = 0;
     }
-    for (size_t idx = 0; idx < data_len; idx++)
+    for (size_t idx = init_idx; idx < data_len; idx++)
     {
         char *cur_pos = data + idx;
         if (*cur_pos == '&')
@@ -444,7 +469,7 @@ void extractData(char *data, size_t data_len)
             else
             {
                 receive_buffer_temp_len = data_len - idx;
-                _memccpy(receive_buffer_temp, cur_pos, sizeof(char), receive_buffer_temp_len);
+                mem_cpy(receive_buffer_temp, data + idx, receive_buffer_temp_len);
                 overflow = true;
                 return;
             }
@@ -545,6 +570,99 @@ static void HelpMarker(const char *desc)
 
 int main()
 {
+
+    // // list all usb devices
+    // libusb_device **devs;
+	// int r;
+	// ssize_t cnt;
+
+	// r = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
+	// if (r < 0)
+	// 	return r;
+
+    // libusb_set_debug(NULL, 3);
+
+	// // cnt = libusb_get_device_list(NULL, &devs);
+	// // if (cnt < 0){
+	// // 	libusb_exit(NULL);
+	// // 	return (int) cnt;
+	// // }
+
+	// // print_devs(devs);
+	// // libusb_free_device_list(devs, 1);
+
+    // static struct libusb_device_handle *devh = NULL;
+    // devh = libusb_open_device_with_vid_pid(NULL, 0x34B7, 0xFFFF);
+	// if (!devh) {
+	// 	fprintf(stderr, "Error finding USB device\n");
+    //     if (devh)
+	// 	    libusb_close(devh);
+	//     libusb_exit(NULL);
+	// }
+
+    // int rc;
+    // for (int if_num = 0; if_num < 2; if_num++) {
+    //     if (libusb_kernel_driver_active(devh, if_num)) {
+    //         libusb_detach_kernel_driver(devh, if_num);
+    //     }
+    //     rc = libusb_claim_interface(devh, if_num);
+    //     if (rc < 0) {
+    //         fprintf(stderr, "Error claiming interface: %s\n",
+    //                 libusb_error_name(rc));
+    //         if (devh)
+	// 	        libusb_close(devh);
+    //         libusb_exit(NULL);
+    //     }
+    // }
+
+	// rc = libusb_claim_interface(devh, 0);
+	// if (rc < 0) {
+	// 	fprintf(stderr, "Error claiming interface: %s\n", libusb_error_name(rc));
+    //     if (devh)
+	// 	    libusb_close(devh);
+	//     libusb_exit(NULL);
+	// }
+
+    // #define CDC_IN_EP  0x81
+    // #define CDC_OUT_EP 0x01
+    // unsigned char usb_recvbuf[10*1024];
+    // unsigned char usb_sendbuf[] = "hellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohellohello";
+    // int recv_len = 0;
+    // size_t recved_len = 0;
+
+    // if (libusb_bulk_transfer(devh, CDC_OUT_EP, usb_sendbuf, sizeof(usb_sendbuf), &recv_len, 10) == 0)
+    // {
+    //     ;
+    // }
+    // printf("%d\n", recv_len);
+
+    // auto start = std::chrono::system_clock::now();
+    // for (int i = 0; i < 10; i++)
+    // {
+    //     if (libusb_bulk_transfer(devh, CDC_IN_EP, usb_recvbuf, sizeof(usb_sendbuf), &recv_len, 10) == 0)
+    //     {
+    //         ;
+    //     }
+    //     printf("%d\n", recv_len);
+    //     recved_len += recv_len;
+    // }
+    // auto end = std::chrono::system_clock::now();
+
+    // std::chrono::duration<double> elapsed_seconds = end-start;
+    // std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+
+    // std::cout << "finished computation at " << std::ctime(&end_time)
+    //           << "elapsed time: " << elapsed_seconds.count() << "s" << "\n"
+    //           << "speed: " << recved_len/elapsed_seconds.count() << "B/s"
+    //           << std::endl;
+
+    // libusb_release_interface(devh, 0);
+
+    // if (devh)
+    //     libusb_close(devh);
+    // libusb_exit(NULL);
+
+
     // std::string code_str =
     //     "float vol; // vol\n"
     //     "uint8_t send_buf[7]; \n";
@@ -763,12 +881,12 @@ int main()
         ImGui::PushItemWidth(0);
 
         ImGui::PushItemWidth(160);
-        static char ip_addr[128] = "192.168.1.2";
-        ImGui::InputTextWithHint("IP", "192.168.1.2", ip_addr, IM_ARRAYSIZE(ip_addr));
+        static char ip_addr[128] = "192.168.1.50";
+        ImGui::InputTextWithHint("IP", "192.168.1.50", ip_addr, IM_ARRAYSIZE(ip_addr));
         ImGui::PopItemWidth();
         ImGui::SameLine();
         ImGui::PushItemWidth(160);
-        static int port = 5000;
+        static int port = 5001;
         ImGui::InputInt("Port", &port);
         ImGui::PopItemWidth();
 
