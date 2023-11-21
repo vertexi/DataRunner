@@ -302,10 +302,10 @@ std::vector<data_channel> create_data_channel_array(const std::string &code_str,
 
 
 bool stop_transfer = true;
-#define DATA_BUF_SIZE (1024 * 1024 * 1024)
+#define DATA_BUF_SIZE (4 * 1024 * 1024 * 1024ULL)
 #define PAKCET_BUF_DIVSION (100) // 100 for 1%, 10 for 10%
 #define RECV_BUF_SIZE (100 * 1024)
-char data_buf[DATA_BUF_SIZE];
+char *data_buf;
 size_t packet_size = 0;
 size_t packet_max = 0;
 size_t packet_idx = 0;
@@ -369,6 +369,9 @@ void dataquery()
     }
     // getting response from server
     // asio::streambuf receive_buffer;
+
+    FILE* pFile;
+    pFile = fopen("dumpfile", "wb");
     std::array<char, RECV_BUF_SIZE> receive_buffer{0};
     receive_buffer.fill(0);
     size_t read_len = 0;
@@ -384,6 +387,7 @@ void dataquery()
         else
         {
             char *data = receive_buffer.data();
+            fwrite(data, 1, read_len, pFile);
             extractData(data, read_len);
         }
         if (one_more_time)
@@ -397,6 +401,7 @@ void dataquery()
         if (stop_transfer)
         {
             one_more_time = true;
+            fclose(pFile);
         }
     }
 }
@@ -674,6 +679,8 @@ int main()
         "uint16_t ad[10]; // AD\n";
 
     channels = create_data_channel_array(code_str, &packet_size);
+
+    data_buf = (char *)malloc(DATA_BUF_SIZE);
     packet_max = DATA_BUF_SIZE / packet_size;
     packet_buf_buf = packet_max / PAKCET_BUF_DIVSION;
 
@@ -1001,6 +1008,7 @@ int main()
     }
 
     stop_socket();
+    free(data_buf);
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
