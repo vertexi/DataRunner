@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <inttypes.h>
 
 #include <sstream>
 #include <vector>
@@ -1066,7 +1067,13 @@ static void ShowLogWindow(bool *p_open)
                     switch (channel.data_type)
                     {
                     case DataType::DataType_uint8_t:
-                        string_buf_idx += snprintf(string_buf + string_buf_idx, sizeof(string_buf), "%s: %d ", channel.name, *((uint8_t *)(data_buf_offset + channel.byte_offset)));
+                        string_buf_idx += snprintf(string_buf + string_buf_idx, sizeof(string_buf), "%s: %" PRIu8 " ", channel.name, *((uint8_t *)(data_buf_offset + channel.byte_offset)));
+                        break;
+                    case DataType::DataType_uint16_t:
+                        string_buf_idx += snprintf(string_buf + string_buf_idx, sizeof(string_buf), "%s: %" PRIu16 " ", channel.name, *((uint16_t *)(data_buf_offset + channel.byte_offset)));
+                        break;
+                    case DataType::DataType_uint32_t:
+                        string_buf_idx += snprintf(string_buf + string_buf_idx, sizeof(string_buf), "%s: %" PRIu32 " ", channel.name, *((uint32_t *)(data_buf_offset + channel.byte_offset)));
                         break;
                     case DataType::DataType_float:
                         string_buf_idx += snprintf(string_buf + string_buf_idx, sizeof(string_buf), "%s: %f ", channel.name, *((float *)(data_buf_offset + channel.byte_offset)));
