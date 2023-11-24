@@ -1,4 +1,4 @@
-add_executable(DataRunner datarunner.cpp)
+add_executable(DataRunner glfw_opengl3.cpp datarunner.cpp)
 
 set_target_properties(DataRunner PROPERTIES COMPILE_FLAGS "/bigobj")
 
