@@ -2,14 +2,6 @@
   "name": "datarunner",
   "version": "0.0",
   "dependencies": [
-    {
-      "name": "imgui",
-      "features": [
-        "glfw-binding",
-        "opengl3-binding",
-        "docking-experimental"
-      ]
-    },
     "glfw3",
     "glad",
     "asio",

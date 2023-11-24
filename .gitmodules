@@ -4,3 +4,6 @@
 [submodule "datarunner/exprtk"]
 	path = datarunner/exprtk
 	url = https://github.com/vertexi/exprtk
+[submodule "datarunner/imgui"]
+	path = datarunner/imgui
+	url = https://github.com/ocornut/imgui
