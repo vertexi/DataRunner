@@ -37,6 +37,7 @@ if(NOT EMSCRIPTEN)
     target_link_libraries(DataRunner PRIVATE ${LIBUSB_LIBRARIES})
 endif()
 
-add_custom_command(TARGET DataRunner PRE_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_directory
-                       ${CMAKE_SOURCE_DIR}/datarunner/res/ $<TARGET_FILE_DIR:DataRunner>)
+# copy assets
+add_custom_command(TARGET DataRunner PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/res/ $<TARGET_FILE_DIR:DataRunner>)
+add_custom_command(TARGET DataRunner PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/demos_assets $<TARGET_FILE_DIR:DataRunner>/demos_assets)
+add_custom_command(TARGET DataRunner PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:DataRunner>/assets)
