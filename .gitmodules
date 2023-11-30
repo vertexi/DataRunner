@@ -1,9 +1,9 @@
-[submodule "datarunner/implot"]
-	path = datarunner/implot
-	url = https://github.com/vertexi/implot
 [submodule "datarunner/exprtk"]
 	path = datarunner/exprtk
 	url = https://github.com/vertexi/exprtk
-[submodule "datarunner/imgui"]
-	path = datarunner/imgui
-	url = https://github.com/ocornut/imgui
+[submodule "datarunner/bgfx"]
+	path = datarunner/bgfx
+	url = https://github.com/bkaradzic/bgfx.cmake
+[submodule "datarunner/imgui_bundle"]
+	path = datarunner/imgui_bundle
+	url = https://github.com/pthom/imgui_bundle.git

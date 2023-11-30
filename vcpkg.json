@@ -2,8 +2,6 @@
   "name": "datarunner",
   "version": "0.0",
   "dependencies": [
-    "glfw3",
-    "glad",
     "asio",
     "libusb"
   ]
