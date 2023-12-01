@@ -28,7 +28,6 @@ datarunner/demos_assets/images/node_editor_fiat.jpg
 datarunner/demos_assets/images/node_editor_screenshot.jpg
 datarunner/demos_assets/images/tennis.jpg
 datarunner/demos_assets/images/world.jpg
-.gitignore
 datarunner/demo_utils/animate_logo.cpp
 datarunner/demo_utils/animate_logo.h
 datarunner/demo_utils/api_demos.cpp
@@ -37,3 +36,4 @@ datarunner/demo_utils/CMakeLists.txt
 datarunner/demo_utils/demo_app_table.cpp
 datarunner/demo_utils/demo_app_table.h
 datarunner/demo_utils/subprocess.h
+datarunner/imgui_bundle_test.cpp
