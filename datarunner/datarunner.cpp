@@ -305,14 +305,16 @@ std::vector<data_channel> create_data_channel_array(const std::string &code_str,
 
 bool stop_transfer = true;
 #define DATA_BUF_SIZE (4 * 1024 * 1024 * 1024ULL)
-#define PAKCET_BUF_DIVSION (100) // 100 for 1%, 10 for 10%
+#define PAKCET_BUF_DIVSION (100) // 1/100 is 1%, 1/10 is 10%
 #define RECV_BUF_SIZE (100 * 1024)
 char *data_buf;
 size_t packet_size = 0;
 size_t packet_max = 0;
 size_t packet_idx = 0;
 size_t packet_round = 0;
-size_t packet_buf_buf = 0; // buffer for when reading from plot not changed by socket
+// there is a race condition between plotter func(get data from buf) and socket_data recv func
+// so when data_buf wrap up ignore a little bit data.
+size_t packet_buf_buf = 0;
 size_t data_buf_idx = 0;
 float data_freq = 10000.0f;
 int plot_downsample = 2000;

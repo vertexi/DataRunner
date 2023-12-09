@@ -1,4 +1,6 @@
 #include "block_Nahimic.hpp"
+#include "gui.hpp"
+#include "data.hpp"
 
 /*
 A more complex app demo
@@ -13,6 +15,7 @@ It demonstrates how to:
 - save some additional user settings within imgui ini file
 */
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "immapp/immapp.h"
 #include "hello_imgui/hello_imgui.h"
 #include "imgui.h"
@@ -47,9 +50,18 @@ struct AppState
     };
     RocketState rocket_state = RocketState::Init;
 
+    enum class ConnectionState {
+        Init,
+        Connecting,
+        Connected
+    };
+
+    ConnectionState connection_state = ConnectionState::Init;
+
     MyAppSettings myAppSettings; // This values will be stored in the application settings
 };
 
+struct DataBuf databuf;
 
 //////////////////////////////////////////////////////////////////////////
 //    Additional fonts handling
@@ -58,9 +70,10 @@ ImFont * gTitleFont;
 void LoadFonts() // This is called by runnerParams.callbacks.LoadAdditionalFonts
 {
     // First, load the default font (the default font should be loaded first)
-    HelloImGui::ImGuiDefaultSettings::LoadDefaultFont_WithFontAwesomeIcons();
+    // HelloImGui::ImGuiDefaultSettings::LoadDefaultFont_WithFontAwesomeIcons();
+    ImFont* font = HelloImGui::LoadFontTTF_WithFontAwesomeIcons("fonts/DroidSans.ttf", 20.f, false);
     // Then load the title font
-    gTitleFont = HelloImGui::LoadFontTTF("fonts/DroidSans.ttf", 18.f);
+    gTitleFont = HelloImGui::LoadFontTTF("fonts/DroidSans.ttf", 20.f);
 }
 
 
@@ -98,6 +111,13 @@ void LoadMyAppSettings(AppState& appState) //
 void SaveMyAppSettings(const AppState& appState)
 {
     HelloImGui::SaveUserPref("MyAppSettings", MyAppSettingsToString(appState.myAppSettings));
+}
+
+
+void SetupImGuiConfig()
+{
+    ImGuiIO &io = ImGui::GetIO();
+    io.MouseDrawCursor = true;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -247,9 +267,47 @@ Most flags are inherited by children dock spaces.
     }
 }
 
-void GuiWindowDataGraph()
+void GuiWindowDataGraph(AppState& appState)
 {
-    ImGui::Text("Data here!");
+    static float progress = 0.0f;
+    ImGui::PushItemWidth(220);
+    static char memory_string[100];
+    if (databuf.packet_round == 0)
+    {
+        progress = (float)databuf.data_buf_idx / DATA_BUF_SIZE;
+        ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
+        ImGui::SameLine();
+        MetricFormatter_orig((double)databuf.data_buf_idx, memory_string, sizeof(memory_string), (void *)"B");
+        ImGui::Text("packet num: %lld/%lld, memory usage: %s", databuf.packet_idx, databuf.packet_max, memory_string);
+    }
+    else
+    {
+        progress = 1.0f;
+        ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
+        ImGui::SameLine();
+        MetricFormatter_orig((double)DATA_BUF_SIZE, memory_string, sizeof(memory_string), (void *)"B");
+        ImGui::Text("packet num: %lld/%lld, memory usage: %s (memory wrap up!)", databuf.packet_max, databuf.packet_max, memory_string);
+    }
+    ImGui::PushItemWidth(0);
+
+    ImGui::PushItemWidth(160);
+    static char ip_addr[128] = "192.168.1.50";
+    ImGui::InputTextWithHint("IP", "192.168.1.50", ip_addr, IM_ARRAYSIZE(ip_addr));
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    ImGui::PushItemWidth(160);
+    static int port = 5001;
+    ImGui::InputInt("Port", &port);
+    ImGui::PopItemWidth();
+
+    ImGui::SameLine();
+    if (appState.connection_state == AppState::ConnectionState::Init)
+    {
+        if (ImGui::Button("Connect"))
+        {
+            // data_socket.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(ip_addr), port));
+        }
+    }
 }
 
 void GuiWindowLayoutCustomization()
@@ -268,8 +326,16 @@ void GuiWindowLayoutCustomization()
     ImGui::Separator();
 }
 
+void DemoAssets()
+{
+    ImGui::PushFont(gTitleFont); ImGui::Text("Hello"); ImGui::PopFont();
+    HelloImGui::ImageFromAsset("images/world.jpg", HelloImGui::EmToVec2(3.f, 3.f));
+}
+
 void GuiWindowDemoFeatures(AppState& appState)
 {
+    DemoAssets();
+    ImGui::Separator();
     DemoBasicWidgets(appState);
     ImGui::Separator();
     DemoRocket(appState);
@@ -445,7 +511,7 @@ std::vector<HelloImGui::DockableWindow> CreateDockableWindows(AppState& appState
     HelloImGui::DockableWindow dataGraphWindow;
     dataGraphWindow.label = "Graph";
     dataGraphWindow.dockSpaceName = "MainDockSpace";
-    dataGraphWindow.GuiFunction = GuiWindowDataGraph;
+    dataGraphWindow.GuiFunction = [&] { GuiWindowDataGraph(appState); };
 
     // A layout customization window will be placed in "MainDockSpace". Its Gui is provided by "GuiWindowLayoutCustomization"
     HelloImGui::DockableWindow layoutCustomizationWindow;
@@ -527,12 +593,12 @@ std::vector<HelloImGui::DockingParams> CreateAlternativeLayouts(AppState& appSta
 //////////////////////////////////////////////////////////////////////////
 int main(int, char**)
 {
-   BlockNahimicOSDInject();
+    BlockNahimicOSDInject();
     ChdirBesideAssetsFolder();
 
-    //###############################################################################################
-    // Part 1: Define the application state, fill the status and menu bars, and load additional font
-    //###############################################################################################
+    //#############################################################################################
+    // Part 1: Define the application state, fill the status and menu bars, load additional font
+    //#############################################################################################
 
     // Our application state
     AppState appState;
@@ -542,14 +608,18 @@ int main(int, char**)
 
     // Note: by setting the window title, we also set the name of the ini files in which the settings for the user
     // layout will be stored: Docking_demo.ini
-    runnerParams.appWindowParams.windowTitle = "Docking demo";
+    runnerParams.appWindowParams.windowTitle = "DataRunner";
 
-    runnerParams.imGuiWindowParams.menuAppTitle = "Docking App";
+    runnerParams.imGuiWindowParams.menuAppTitle = "DataRunner";
     runnerParams.appWindowParams.windowGeometry.size = {1000, 900};
     runnerParams.appWindowParams.restorePreviousGeometry = true;
+    // runnerParams.appWindowParams.borderless = true;
+    runnerParams.appWindowParams.resizable = true;
 
     // Set LoadAdditionalFonts callback
     runnerParams.callbacks.LoadAdditionalFonts = LoadFonts;
+
+    runnerParams.callbacks.SetupImGuiConfig = SetupImGuiConfig;
 
     //
     // Status bar
@@ -575,9 +645,9 @@ int main(int, char**)
     runnerParams.callbacks.PostInit = [&appState]   { LoadMyAppSettings(appState);};
     runnerParams.callbacks.BeforeExit = [&appState] { SaveMyAppSettings(appState);};
 
-    //###############################################################################################
+    //#############################################################################################
     // Part 2: Define the application layout and windows
-    //###############################################################################################
+    //#############################################################################################
 
     // First, tell HelloImGui that we want full screen dock space (this will create "MainDockSpace")
     runnerParams.imGuiWindowParams.defaultImGuiWindowType = HelloImGui::DefaultImGuiWindowType::ProvideFullScreenDockSpace;
@@ -592,9 +662,36 @@ int main(int, char**)
     //     (otherwise, modifications to the layout applied by the user layout will be remembered)
     // runnerParams.dockingParams.layoutCondition = HelloImGui::DockingLayoutCondition::ApplicationStart;
 
-    //###############################################################################################
-    // Part 3: Run the app
-    //###############################################################################################
+    //#############################################################################################
+    // Part 3: Where to save the app settings
+    //#############################################################################################
+    // tag::app_settings[]
+    // By default, HelloImGui will save the settings in the current folder.
+    // This is convenient when developing, but not so much when deploying the app.
+    // You can tell HelloImGui to save the settings in a specific folder: choose between
+    //         CurrentFolder
+    //         AppUserConfigFolder
+    //         AppExecutableFolder
+    //         HomeFolder
+    //         TempFolder
+    //         DocumentsFolder
+    //
+    // Note: AppUserConfigFolder is:
+    //         AppData under Windows (Example: C:\Users\[Username]\AppData\Roaming)
+    //         ~/.config under Linux
+    //         "~/Library/Application Support" under macOS or iOS
+    runnerParams.iniFolderType = HelloImGui::IniFolderType::AppUserConfigFolder;
+
+    // runnerParams.iniFilename: this will be the name of the ini file in which the settings
+    // will be stored.
+    // In this example, the subdirectory Docking_Demo will be created under the folder defined
+    // by runnerParams.iniFolderType.
+    //
+    // Note: if iniFilename is left empty, the name of the ini file will be derived
+    // from appWindowParams.windowTitle
+    runnerParams.iniFilename = "Docking_Demo/Docking_demo.ini";
+    // end::app_settings[]
+
     ImmApp::AddOnsParams addons;
     addons.withMarkdown = true;
     addons.withNodeEditor = true;
@@ -602,7 +699,6 @@ int main(int, char**)
     addons.withTexInspect = true;
 
     ImmApp::Run(runnerParams, addons);
-    // HelloImGui::Run(runnerParams); // Note: with ImGuiBundle, it is also possible to use ImmApp::Run(...)
 
     return 0;
 }

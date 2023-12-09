@@ -10,7 +10,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # add_executable(DataRunner imgui_bundle_test.cpp)
 add_subdirectory(imgui_bundle)
 add_subdirectory(demo_utils)
-imgui_bundle_add_app(DataRunner datarunner_gui.cpp block_Nahimic.cpp block_Nahimic.hpp)
+imgui_bundle_add_app(DataRunner
+    datarunner_gui.cpp
+    # bgfx_test.cpp
+    block_Nahimic.cpp
+    block_Nahimic.hpp
+    data.cpp
+    data.hpp
+    gui.cpp
+    gui.hpp
+    tcp.cpp
+    tcp.hpp
+    datarunner_core.cpp
+    datarunner_core.hpp)
 target_link_libraries(DataRunner PUBLIC demo_utils)
 
 target_compile_features(DataRunner PRIVATE cxx_std_20)

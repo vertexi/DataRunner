@@ -37,3 +37,4 @@ datarunner/demo_utils/demo_app_table.cpp
 datarunner/demo_utils/demo_app_table.h
 datarunner/demo_utils/subprocess.h
 datarunner/imgui_bundle_test.cpp
+datarunner/bgfx_test.cpp
