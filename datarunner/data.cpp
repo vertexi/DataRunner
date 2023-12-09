@@ -12,7 +12,7 @@ const uint16_t DataTypeSize[] =
      sizeof(float),
      sizeof(double)};
 
-std::map<std::string, enum class DataType> DataTypeDict = {
+std::map<std::string, enum DataType> DataTypeDict = {
     {"int8_t", DataType::DataType_int8_t},
     {"int16_t", DataType::DataType_int16_t},
     {"int32_t", DataType::DataType_int32_t},
@@ -25,7 +25,7 @@ std::map<std::string, enum class DataType> DataTypeDict = {
     {"double", DataType::DataType_double},
 };
 
-std::map<enum class DataType, std::string> DataTypeStringDict = {
+std::map<enum DataType, std::string> DataTypeStringDict = {
     {DataType::DataType_int8_t, "int8_t"},
     {DataType::DataType_int16_t, "int16_t"},
     {DataType::DataType_int32_t, "int32_t"},

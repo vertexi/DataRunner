@@ -1,4 +1,7 @@
+#ifdef _WIN32
 #include "block_Nahimic.hpp"
+#endif
+
 #include "gui.hpp"
 #include "data.hpp"
 
@@ -278,7 +281,7 @@ void GuiWindowDataGraph(AppState& appState)
         ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
         ImGui::SameLine();
         MetricFormatter_orig((double)databuf.data_buf_idx, memory_string, sizeof(memory_string), (void *)"B");
-        ImGui::Text("packet num: %lld/%lld, memory usage: %s", databuf.packet_idx, databuf.packet_max, memory_string);
+        ImGui::Text("packet num: %zu/%zu, memory usage: %s", databuf.packet_idx, databuf.packet_max, memory_string);
     }
     else
     {
@@ -286,7 +289,7 @@ void GuiWindowDataGraph(AppState& appState)
         ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
         ImGui::SameLine();
         MetricFormatter_orig((double)DATA_BUF_SIZE, memory_string, sizeof(memory_string), (void *)"B");
-        ImGui::Text("packet num: %lld/%lld, memory usage: %s (memory wrap up!)", databuf.packet_max, databuf.packet_max, memory_string);
+        ImGui::Text("packet num: %zu/%zu, memory usage: %s (memory wrap up!)", databuf.packet_max, databuf.packet_max, memory_string);
     }
     ImGui::PushItemWidth(0);
 
@@ -593,7 +596,9 @@ std::vector<HelloImGui::DockingParams> CreateAlternativeLayouts(AppState& appSta
 //////////////////////////////////////////////////////////////////////////
 int main(int, char**)
 {
+    #ifdef _WIN32
     BlockNahimicOSDInject();
+    #endif
     ChdirBesideAssetsFolder();
 
     //#############################################################################################

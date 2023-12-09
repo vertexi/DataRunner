@@ -23,7 +23,7 @@ struct data_channel
     size_t id;
     char *name;
     size_t byte_offset;
-    enum class DataType data_type;
+    enum DataType data_type;
 };
 
 #define DATA_BUF_SIZE (4 * 1024 * 1024 * 1024ULL)
@@ -47,5 +47,5 @@ struct DataBuf
 };
 
 extern const uint16_t DataTypeSize[];
-extern std::map<std::string, enum class DataType> DataTypeDict;
-extern std::map<enum class DataType, std::string> DataTypeStringDict;
+extern std::map<std::string, enum DataType> DataTypeDict;
+extern std::map<enum DataType, std::string> DataTypeStringDict;

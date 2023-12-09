@@ -3,7 +3,7 @@ import socketserver
 import sys
 
 
-DIRECTORY = "build/"
+DIRECTORY = "build_emscripten\datarunner"
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
