@@ -1,0 +1,11 @@
+--- ExternalAntlr4Cpp.cmake	2023-12-10 18:19:29.582239800 +0800
++++ ExternalAntlr4Cpp.cmake_	2023-12-10 18:19:16.016811200 +0800
+@@ -27,7 +27,7 @@
+   set(ANTLR4_OUTPUT_DIR ${ANTLR4_ROOT}/runtime/Cpp/runtime)
+ endif()
+ 
+-if(MSVC)
++if(MSVC OR EMSCRIPTEN)
+   set(ANTLR4_STATIC_LIBRARIES
+       ${ANTLR4_OUTPUT_DIR}/antlr4-runtime-static.lib)
+   set(ANTLR4_SHARED_LIBRARIES

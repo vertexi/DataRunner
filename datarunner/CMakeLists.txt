@@ -46,6 +46,9 @@ set_target_properties(DataRunner PROPERTIES CXX_EXTENSIONS OFF)
 add_subdirectory(exprtk)
 target_link_libraries(DataRunner PUBLIC exprtk)
 
+add_subdirectory(antlr)
+target_link_libraries(DataRunner PUBLIC antlr)
+
 if(NOT EMSCRIPTEN)
     find_package(asio CONFIG REQUIRED)
     target_link_libraries(DataRunner PRIVATE asio asio::asio)

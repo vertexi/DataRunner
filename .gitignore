@@ -39,3 +39,6 @@ datarunner/demo_utils/subprocess.h
 datarunner/imgui_bundle_test.cpp
 datarunner/bgfx_test.cpp
 build_emscripten/
+datarunner/antlr/antlr4-cpp-runtime
+datarunner/antlr/archive
+datarunner/antlr/.antlr
