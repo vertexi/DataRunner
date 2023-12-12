@@ -42,3 +42,4 @@ build_emscripten/
 datarunner/antlr/antlr4-cpp-runtime
 datarunner/antlr/archive
 datarunner/antlr/.antlr
+datarunner/antlr/output

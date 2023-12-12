@@ -2,12 +2,17 @@ cmake_minimum_required(VERSION 3.12)
 project(DataRunner)
 
 # add_executable(DataRunner glfw_opengl3.cpp datarunner.cpp)
+# add_executable(DataRunner imgui_bundle_test.cpp)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# add_executable(DataRunner imgui_bundle_test.cpp)
+# suppress MSVC C4819: The file contains a character that cannot be represented in the current code page
+if(MSVC)
+    add_compile_options("/utf-8")
+endif(MSVC)
+
 add_subdirectory(imgui_bundle)
 add_subdirectory(demo_utils)
 imgui_bundle_add_app(DataRunner
@@ -27,8 +32,12 @@ target_link_libraries(DataRunner PUBLIC demo_utils)
 
 target_compile_features(DataRunner PRIVATE cxx_std_20)
 
+# if(EMSCRIPTEN)
+#     target_link_options(DataRunner PUBLIC -sERROR_ON_UNDEFINED_SYMBOLS=0)
+# endif()
 if(MSVC)
     set_target_properties(DataRunner PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS")
+    target_compile_definitions(DataRunner PRIVATE "-D_WIN32_WINNT=0x0601")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:__cplusplus /std:c++20")
     option(CMAKE_USE_WIN32_THREADS_INIT "using WIN32 threads" ON)
 

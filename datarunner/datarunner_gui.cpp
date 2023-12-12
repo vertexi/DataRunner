@@ -4,6 +4,7 @@
 
 #include "gui.hpp"
 #include "data.hpp"
+#include "parser.hpp"
 
 /*
 A more complex app demo
@@ -386,6 +387,7 @@ void ShowMenuGui()
         if (clicked)
         {
             HelloImGui::Log(HelloImGui::LogLevel::Warning, "It works");
+            HelloImGui::Log(HelloImGui::LogLevel::Warning, parseC("int a = 3;").c_str());
         }
         ImGui::EndMenu();
     }
