@@ -6,6 +6,7 @@
 #include "data.hpp"
 #include "parser.hpp"
 #include "tcp.hpp"
+#include "datarunner_gui.h"
 
 /*
 A more complex app demo

@@ -62,9 +62,11 @@ std::string parseC(const std::string & codeToParse)
                         errorInfo = "array size not found";
                     }
                     auto variableName = variableNameAndSize->directDeclarator();
+                    varName = variableName ? variableName->getText() : "unknown";
+                } else {
+                    auto variableName = variableNameAndSize;
+                    varName = variableName ? variableName->getText() : "unknown";
                 }
-                auto variableName = variableNameAndSize;
-                varName = variableName ? variableName->getText() : "unknown";
             }
             auto declarationSpecifiers = variableDeclaration->declarationSpecifiers()->declarationSpecifier();
             if (hasInit)
