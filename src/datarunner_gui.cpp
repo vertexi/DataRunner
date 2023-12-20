@@ -5,6 +5,7 @@
 #include "gui.hpp"
 #include "data.hpp"
 #include "parser.hpp"
+#include "tcp.hpp"
 
 /*
 A more complex app demo
@@ -339,7 +340,8 @@ void GuiWindowDataGraph(AppState& appState)
     {
         if (ImGui::Button("Connect"))
         {
-            // data_socket.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(ip_addr), port));
+            HelloImGui::Log(HelloImGui::LogLevel::Info, "Connecting to %s:%d", ip_addr, port);
+            TcpTryConnect(ip_addr, port);
         }
     }
 }
@@ -631,6 +633,10 @@ std::vector<HelloImGui::DockingParams> CreateAlternativeLayouts(AppState& appSta
     return {alternativeLayout, tabsLayout};
 };
 
+void AppPoll()
+{
+    TcpPoll();
+}
 
 //////////////////////////////////////////////////////////////////////////
 //    main(): here, we simply fill RunnerParams, then run the application
@@ -666,6 +672,8 @@ int main(int, char**)
     runnerParams.callbacks.LoadAdditionalFonts = LoadFonts;
 
     runnerParams.callbacks.SetupImGuiConfig = SetupImGuiConfig;
+
+    runnerParams.callbacks.AfterSwap = AppPoll;
 
     //
     // Status bar

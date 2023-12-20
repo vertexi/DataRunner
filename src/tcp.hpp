@@ -5,6 +5,9 @@
 
 
 extern asio::ip::tcp::socket data_socket;
+
+void TcpPoll();
+void TcpTryConnect(const char *ip_addr, const int port);
 #endif
 
 
