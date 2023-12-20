@@ -2,6 +2,8 @@ uint32_t c;
 
 int a;
 
+d;
+
 unsigned int b;
 
 float f[3];

@@ -80,9 +80,11 @@ std::string parseC(const std::string & codeToParse)
                 {
                     // TODO: handle multiple declaration specifiers
                     typeName = "error: Multiple declaration specifiers";
-                } else {
+                } else if (declarationSpecifiers.size() == 2) {
                     typeName = declarationSpecifiers[0]->getText();
                     varName = declarationSpecifiers[1]->getText();
+                } else {
+                    typeName = "error: No declaration specifiers";
                 }
             }
 
