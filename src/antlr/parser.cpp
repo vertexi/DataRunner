@@ -1,36 +1,112 @@
 #include "parser.hpp"
 
+#include <charconv>
+
 #include "antlr4-runtime.h"
 #include "CLexer.h"
 #include "CParser.h"
 #include "CBaseVisitor.h"
 #include "CVisitor.h"
 
-std::string parseC(std::string input_str)
+#include "hello_imgui/hello_imgui.h"
+
+std::string parseC(const std::string & codeToParse)
 {
-    antlr4::ANTLRInputStream input(input_str);
+    antlr4::ANTLRInputStream input(codeToParse);
     CLexer lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
     CParser parser(&tokens);
-    auto *tree = parser.declaration();
-    auto str = tree->toStringTree(&parser);
+    std::string declarationTypeRes = "";
 
-    // std::cout << tree->toStringTree(&parser) << std::endl;
+    // get variable declarations from CST
+    auto declarations = parser.translationUnit()->externalDeclaration();
 
-    // // Associate a visitor with the Suite context
-    // CparseLib::CBaseVisitor visitor;
+    for (auto declaration : declarations)
+    {
+        // if is a variable declaration
+        if (auto variableDeclaration = declaration->declaration())
+        {
+            bool isArray = false;
+            bool hasInit = false;
+            bool parseError = false;
+            uint64_t arraySize = 0;
+            std::string typeName = "";
+            std::string varName = "";
+            std::string errorInfo = "";
 
-    // std::string str = visitor.visitExternalDeclaration(parser.externalDeclaration()).type().name();
-    // // std::cout << "Visitor output: " << str << std::endl;
+            auto variableInitList = variableDeclaration->initDeclaratorList();
+            auto variableInit = variableInitList ? variableInitList->initDeclarator() : std::vector<CParser::InitDeclaratorContext *>();
+            if (variableInit.size() >= 1)
+            {
+                // got init declarator, perphaps a variable declaration with init value or array declaration
+                hasInit = true;
+                auto variableNameAndSize = variableInit[0]->declarator()->directDeclarator();
+                if (variableNameAndSize->LeftBracket())
+                {
+                    // array declaration
+                    // TODO: Hex conversion is not supported yet maybe use stoi instead
+                    isArray = true;
+                    if (variableNameAndSize->assignmentExpression())
+                    {
+                        uint64_t arraySizeTmp = 0;
+                        auto arraySizeStr = variableNameAndSize->assignmentExpression()->getText();
+                        if (std::from_chars(arraySizeStr.data(), arraySizeStr.data() + arraySizeStr.size(), arraySizeTmp).ec  == std::errc{})
+                        {
+                            arraySize = arraySizeTmp;
+                        } else {
+                            parseError = true;
+                            errorInfo = "array size convert error: " + arraySizeStr;
+                        }
+                    } else {
+                        parseError = true;
+                        errorInfo = "array size not found";
+                    }
+                }
+                auto variableName = variableNameAndSize->directDeclarator();
+                varName = variableName ? variableName->getText() : "unknown";
+            }
+            auto declarationSpecifiers = variableDeclaration->declarationSpecifiers()->declarationSpecifier();
+            if (hasInit)
+            {
+                if (declarationSpecifiers.size() > 1)
+                {
+                    // TODO: handle multiple declaration specifiers
+                    typeName = "error: Multiple declaration specifiers";
+                } else {
+                    typeName = declarationSpecifiers[0] -> typeSpecifier()->getText();
+                }
+            } else {
+                if (declarationSpecifiers.size() > 2)
+                {
+                    // TODO: handle multiple declaration specifiers
+                    typeName = "error: Multiple declaration specifiers";
+                } else {
+                    typeName = declarationSpecifiers[0]->getText();
+                    varName = declarationSpecifiers[1]->getText();
+                }
+            }
 
-    // parser.compilationUnit()->translationUnit()->externalDeclaration();
+            declarationTypeRes += "type: ";
+            declarationTypeRes += typeName;
+            declarationTypeRes += " ";
+            declarationTypeRes += "name: ";
+            declarationTypeRes += varName;
+            declarationTypeRes += " ";
+            if (isArray)
+            {
+                declarationTypeRes += "arrysize: ";
+                declarationTypeRes += std::to_string(arraySize);
+                declarationTypeRes += " ";
+            }
+            if (parseError)
+            {
+                declarationTypeRes += "error: ";
+                declarationTypeRes += errorInfo;
+                declarationTypeRes += " ";
+            }
+            declarationTypeRes += "\n";
+        }
+    }
 
-    // // Associate a listener with the file_input context
-    // // std::cout << "Listener output" << std::endl;
-    // antlr4::tree::ParseTreeWalker walker;
-    // antlr4::ParserRuleContext* fileInput = parser.TranslationUnitContext();
-    // Python3BaseListener* listener = new Python3BaseListener();
-    // walker.walk(listener, fileInput);
-
-    return str;
+    return declarationTypeRes;
 }

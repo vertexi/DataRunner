@@ -2,4 +2,4 @@
 
 #include <iostream>
 
-std::string parseC(std::string input_str);
+std::string parseC(const std::string & input_str);

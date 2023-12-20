@@ -41,4 +41,4 @@ file(GLOB CparserFilesList "${CMAKE_CURRENT_LIST_DIR}/output/*.cpp" "${CMAKE_CUR
 add_library(antlr parser.cpp parser.hpp ${CparserFilesList})
 add_dependencies(antlr CparserFiles)
 target_include_directories(antlr PUBLIC ${CMAKE_CURRENT_LIST_DIR} ${ANTLR4_INC} ${CMAKE_CURRENT_LIST_DIR}/output)
-target_link_libraries(antlr PUBLIC antlr4_static)
+target_link_libraries(antlr PUBLIC antlr4_static hello_imgui)

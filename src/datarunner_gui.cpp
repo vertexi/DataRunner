@@ -27,6 +27,7 @@ It demonstrates how to:
 #include "imgui_internal.h"
 #include "implot/implot.h"
 #include "demo_utils/api_demos.h"
+#include "ImGuiColorTextEdit/TextEditor.h"
 
 #include <sstream>
 
@@ -271,8 +272,37 @@ Most flags are inherited by children dock spaces.
     }
 }
 
+TextEditor initCppTexteditor(const std::string & code)
+{
+    TextEditor editor;
+    editor.SetText(code);
+    editor.SetLanguageDefinition(TextEditor::LanguageDefinition::CPlusPlus());
+    editor.SetPalette(TextEditor::GetMarianaPalette());
+    return editor;
+}
+
 void GuiWindowDataGraph(AppState& appState)
 {
+    static TextEditor editor = initCppTexteditor("int main () { return 0; }\n");
+    static ImVec2 textEditorSize = ImVec2(ImGui::GetContentRegionAvail().x - HelloImGui::EmSize(1.0f), HelloImGui::EmSize(10.0f));
+    ImGui::PushFont(ImGuiMd::GetCodeFont());
+    editor.Render("Code",
+        false,
+        textEditorSize,
+        true);
+    ImGui::PopFont();
+
+    ImGui::Separator();
+
+    static TextEditor parserResShow = initCppTexteditor(parseC(editor.GetText()));
+    if (editor.IsTextChanged())
+    {
+        parserResShow.SetText(parseC(editor.GetText()));
+        parserResShow.SetReadOnly(true);
+    }
+    ImGuiMd::RenderUnindented("# Code parser result: \n");
+    parserResShow.Render("Parser Result", false, textEditorSize, false);
+
     static float progress = 0.0f;
     ImGui::PushItemWidth(220);
     static char memory_string[100];
@@ -387,7 +417,16 @@ void ShowMenuGui()
         if (clicked)
         {
             HelloImGui::Log(HelloImGui::LogLevel::Warning, "It works");
-            HelloImGui::Log(HelloImGui::LogLevel::Warning, parseC("int a = 3;").c_str());
+            HelloImGui::Log(HelloImGui::LogLevel::Info,
+                "float a[3] = {0, 1, 2};\n"
+                "int a = 3;\n"
+                "int b = 3;\n"
+            );
+            HelloImGui::Log(HelloImGui::LogLevel::Warning, parseC(
+                "float a[3] = {0, 1, 2};\n"
+                "int a = 3;\n"
+                "int b = 3;\n"
+            ).c_str());
         }
         ImGui::EndMenu();
     }
@@ -618,8 +657,8 @@ int main(int, char**)
     runnerParams.appWindowParams.windowTitle = "DataRunner";
 
     runnerParams.imGuiWindowParams.menuAppTitle = "DataRunner";
-    runnerParams.appWindowParams.windowGeometry.size = {1000, 900};
-    runnerParams.appWindowParams.restorePreviousGeometry = true;
+    runnerParams.appWindowParams.windowGeometry.size = {1280, 720};
+    runnerParams.appWindowParams.restorePreviousGeometry = false;
     // runnerParams.appWindowParams.borderless = true;
     runnerParams.appWindowParams.resizable = true;
 
