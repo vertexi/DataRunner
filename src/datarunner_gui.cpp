@@ -286,12 +286,11 @@ void GuiWindowDataGraph(AppState& appState)
 {
     static TextEditor editor = initCppTexteditor("int main () { return 0; }\n");
     static ImVec2 textEditorSize = ImVec2(ImGui::GetContentRegionAvail().x - HelloImGui::EmSize(1.0f), HelloImGui::EmSize(10.0f));
-    ImGui::PushFont(ImGuiMd::GetCodeFont());
+    // ImGui::PushFont(ImGuiMd::GetCodeFont());
     editor.Render("Code",
         false,
         textEditorSize,
         true);
-    ImGui::PopFont();
 
     ImGui::Separator();
 
@@ -301,8 +300,9 @@ void GuiWindowDataGraph(AppState& appState)
         parserResShow.SetText(parseC(editor.GetText()));
         parserResShow.SetReadOnly(true);
     }
-    ImGuiMd::RenderUnindented("# Code parser result: \n");
+    ImGui::TextUnformatted("Code parser result:");
     parserResShow.Render("Parser Result", false, textEditorSize, false);
+    // ImGui::PopFont();
 
     static float progress = 0.0f;
     ImGui::PushItemWidth(220);
@@ -419,16 +419,6 @@ void ShowMenuGui()
         if (clicked)
         {
             HelloImGui::Log(HelloImGui::LogLevel::Warning, "It works");
-            HelloImGui::Log(HelloImGui::LogLevel::Info,
-                "float a[3] = {0, 1, 2};\n"
-                "int a = 3;\n"
-                "int b = 3;\n"
-            );
-            HelloImGui::Log(HelloImGui::LogLevel::Warning, parseC(
-                "float a[3] = {0, 1, 2};\n"
-                "int a = 3;\n"
-                "int b = 3;\n"
-            ).c_str());
         }
         ImGui::EndMenu();
     }
@@ -638,6 +628,16 @@ void AppPoll()
     TcpPoll();
 }
 
+void AppPostInit()
+{
+    TcpServiceStart();
+}
+
+void AppExit()
+{
+    TcpServiceStop();
+}
+
 //////////////////////////////////////////////////////////////////////////
 //    main(): here, we simply fill RunnerParams, then run the application
 //////////////////////////////////////////////////////////////////////////
@@ -672,8 +672,11 @@ int main(int, char**)
     runnerParams.callbacks.LoadAdditionalFonts = LoadFonts;
 
     runnerParams.callbacks.SetupImGuiConfig = SetupImGuiConfig;
-
     runnerParams.callbacks.AfterSwap = AppPoll;
+    // runnerParams.callbacks.PostInit = AppPostInit;
+    runnerParams.callbacks.BeforeExit_PostCleanup = AppExit;
+
+    AppPostInit();
 
     //
     // Status bar

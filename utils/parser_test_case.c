@@ -10,6 +10,8 @@ float f[3];
 
 int s[0x99];
 
+int a = 3;
+
 float a[3] = {0, 1, 2};
 
 unsigned int b = 3;
