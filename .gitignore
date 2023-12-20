@@ -15,6 +15,6 @@ src/imgui_bundle_test.cpp
 src/bgfx_test.cpp
 src/antlr/antlr4-cpp-runtime/
 src/antlr/archive/
-src/antlr/.antlr
+src/antlr/.antlr/
 src/antlr/output/
 CMakeSettings.json
